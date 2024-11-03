@@ -4,7 +4,7 @@ from PIL import Image, ImageTk
 import cv2
 import os
 
-class FrameViewer:
+class FrameViewer: # TODO: refact this class; should be more like Video instead of Frame_viewer
     def __init__(self, root, frames_dir):
         self.root = root
         self.root.title("Frame Viewer - Select Point")
@@ -12,7 +12,7 @@ class FrameViewer:
         # Directory containing the frames
         self.frames_dir = frames_dir
         self.frame_index = 0  # Start with the first frame
-        self.coordinates = {}  # Store selected coordinates for each frame index
+        self.coordinates = {}  # Dictionary of points selected in each of the frames.
         
         self.image_panel = tk.Label(self.root)
         self.image_panel.pack()
@@ -58,29 +58,6 @@ class FrameViewer:
         self.image_panel.image = self.current_image  # Keep a reference to prevent GC
         self.root.title(f"Frame Viewer - Frame {index}")
         
-    # def load_frame(self, index):
-    #     # Load a specific frame by index
-    #     frame_path = os.path.join(self.frames_dir, f"{index:05d}.jpg")
-        
-    #     if not os.path.exists(frame_path):
-    #         messagebox.showerror("Error", f"No frame found at {frame_path}")
-    #         return
-        
-    #     # Load the frame and convert it for Tkinter display
-    #     frame = cv2.imread(frame_path)
-    #     if frame is None:
-    #         raise ValueError(f"Failed to load frame: {frame_path}")
-        
-    #     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    #     frame = cv2.resize(frame, (640, 360))  # Resize for display
-    #     image = Image.open(frame)
-    #     self.current_image = ImageTk.PhotoImage(image)
-        
-    #     # Update the image panel
-    #     self.image_panel.config(image=self.current_image)
-    #     self.image_panel.image = self.current_image  # Keep a reference to prevent GC
-    #     self.root.title(f"Frame Viewer - Frame {index}")
-
     def on_click(self, event):
         # Capture and store coordinates of the clicked point for the current frame
         x, y = event.x, event.y

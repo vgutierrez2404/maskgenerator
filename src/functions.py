@@ -1,5 +1,7 @@
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt  
 import numpy as np 
+from PIL import Image, ImageTk
+import os 
 
 def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:
@@ -24,3 +26,11 @@ def show_box(box, ax):
     x0, y0 = box[0], box[1]
     w, h = box[2] - box[0], box[3] - box[1]
     ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0, 0, 0, 0), lw=2))
+
+def show_mask_on_frame(ann_frame_idx, video_dir, frame_names, points, labels, out_mask_logits,out_obj_ids ): 
+
+    plt.figure(figsize=(9, 6))
+    plt.title(f"frame {ann_frame_idx}")
+    plt.imshow(Image.open(os.path.join(video_dir, frame_names[ann_frame_idx])))
+    show_points(points, labels, plt.gca())
+    show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])

@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import cv2
+import numpy as np 
 import os 
 from PIL import Image, ImageTk
 import subprocess
@@ -11,12 +11,11 @@ import sys
 sys.path.insert(0, os.path.abspath("./sam2"))
 
 # Local libraries 
-from video_app import VideoApp
-from frame_viewer import FrameViewer
+from src.video_app import VideoApp
+from src.frame_viewer import FrameViewer
 from sam2.build_sam import build_sam2_video_predictor
-from predictor import Predictor
-
-
+from src.predictor import Predictor
+import src.functions as fnc
 # Global flag for root window
 main_root = None
 
@@ -47,6 +46,8 @@ def slice_video(video_path, output_dir):
 
     except subprocess.CalledProcessError as e:
         print("An error occurred while running ffmpeg:", e)
+
+    return frame_names
 
 def check_device_used(): 
     """
@@ -91,7 +92,7 @@ def on_video_confirmed(video_path, output_dir):
     
     # Slice the video into frames. This should only happen in the 
     # case that the video is not already sliced. 
-    slice_video(video_path, output_dir)
+    frame_names = slice_video(video_path, output_dir)
 
     # Destroy the previsualizer when the video is confirmed. 
     if main_root is not None:
@@ -100,16 +101,29 @@ def on_video_confirmed(video_path, output_dir):
     # Create a new Tkinter root window for the frame viewer
     frame_root = tk.Tk()
     frame_viewer = FrameViewer(frame_root, output_dir)  # output_dir is the frame directory
-    frame_root.mainloop()
-
+    frame_root.mainloop()   
+    
+    # TODO: esto hay que llevarlo a otra funcion 
     device = check_device_used()
     predictor = Predictor(device=device) # this is the initialization of the SAM predictor. 
 
     inference_state = predictor.init_state(video_path=output_dir) # the direction of the video is the output directory?? 
-    
-    # Retrieve selected coordinates from the frame viewer
-    selected_coordinates = frame_viewer.get_coordinates()
-    print(f"The selected coordinates in the video are: {selected_coordinates}")
+    labels = np.array([1], np.int32) 
+    points = frame_viewer.get_coordinates()
+    print(f"The selected coordinates in the video are: {points}")
+
+    ann_frame_idx = 0  # the frame index we interact with
+    ann_obj_id = 1 
+
+    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
+    inference_state=inference_state,
+    frame_idx=ann_frame_idx,
+    obj_id=ann_obj_id,
+    points=points,
+    labels=labels,
+    )
+
+    fnc.show_mask_on_frame(ann_frame_idx, output_dir, frame_names, points, labels, out_mask_logits, out_obj_ids)
 
 def main():
     global main_root
