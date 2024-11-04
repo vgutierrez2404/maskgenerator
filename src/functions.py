@@ -2,6 +2,57 @@ import matplotlib.pyplot as plt
 import numpy as np 
 from PIL import Image, ImageTk
 import os 
+import subprocess
+
+def find_frames(output_dir: str) -> list: 
+    """
+    Finds and returns the frames in a directory and sorts from min to max
+    being assigned each number an integer in based of its position 
+    in the video. 
+    """
+
+    frame_names = [
+            p for p in os.listdir(output_dir)
+            if os.path.splitext(p)[-1].lower() in [".jpg", ".jpeg"]
+    ]
+    frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+
+    return frame_names 
+
+def slice_video(video_path, output_dir): 
+    """
+    This function inputs a video and slice it in frames that 
+    will be used for the frame prediction later. 
+
+    It should use a class Video where all the frames of that video are stored. 
+    """
+    # Generate output directory if it does not exist. 
+    os.makedirs(output_dir, exist_ok=True)
+
+    # The ffmpge commnad that will be used to slice the video. Retrieved
+    # from META notebook. 
+    ffmpeg_command = [
+        'ffmpeg',
+        '-i', video_path,
+        '-q:v', '2',  # Quality factor for image
+        '-start_number', '0',  # Start numbering frames from 0
+        os.path.join(output_dir, '%05d.jpg')  # Output pattern for frames
+    ]
+
+    try:   
+        if len(os.listdir(output_dir)) == 0:  # Slice the video in frames
+            subprocess.run(ffmpeg_command, check=True)
+            print(f"Frames extracted to {output_dir} successfully. ")
+
+        frame_names = find_frames(output_dir)
+
+        print(f"Found {len(frame_names)} frames in {output_dir} directory.")
+
+    except subprocess.CalledProcessError as e:
+        print("An error occurred while running ffmpeg:", e)
+
+    return frame_names
+
 
 def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:
