@@ -7,7 +7,7 @@ import os
 from src.video import Video
 
 class VideoViewer: 
-    def __init__(self, root, results_dir): 
+    def __init__(self, root, video:Video): 
         self.root = root
         self.root.title("Video Segmenter - Previsualization")
 
@@ -19,10 +19,10 @@ class VideoViewer:
         button_frame = tk.Frame(self.root)
         button_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        self.video = Video(results_dir) # this class should be filled with the commands that are displayed below
+        self.video = video # this class should be filled with the commands that are displayed below
         self.playing_video_path = None
 
-        self.confirm_button = tk.Button(button_frame, text="Confirm Video", command=self.video.confirm_video)
+        self.confirm_button = tk.Button(button_frame, text="Confirm Video", command=self.confirm_video)
         self.confirm_button.pack(side=tk.LEFT, padx=5)
         
         self.change_button = tk.Button(button_frame, text="Change Video", command=self.change_video)
@@ -56,15 +56,11 @@ class VideoViewer:
         if self.video.playing and not self.video.paused and self.video.cap.isOpened():
             ret, frame = self.video.cap.read()
             if ret:
-                # Resize frame and display it in Tkinter
-                frame = cv2.resize(frame, (640, 360))  # Resize for display
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img = Image.fromarray(frame)
-                imgtk = ImageTk.PhotoImage(image=img)
+                # Convert opencv image to tkinter image
+                current_frame = self.video.process_frame(frame)
+                self.video_panel.imgtk = current_frame
+                self.video_panel.config(image=current_frame)
 
-                self.video_panel.imgtk = imgtk
-                self.video_panel.config(image=imgtk)
-                
                 # Schedule next frame update
                 self.root.after(self.video.update_delay, self.update_video)
 

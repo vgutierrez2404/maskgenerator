@@ -19,6 +19,10 @@ class Video:
         self.update_delay = 30 
         self.on_confirm = None 
 
+        # For the predictions, the coordinates will be stored in a 
+        # dictionary that contains [frame, coordinate]
+        self.coordinates = {} 
+
     
     def set_output_dir(self): 
         self.output_dir = os.path.join(self.results_dir, self.video_name)
@@ -55,8 +59,18 @@ class Video:
         self.cap.release()
         # Notify main application that video is confirmed
         if self.on_confirm:
-            self.on_confirm(self.video_path, self.output_dir)
+            # self.on_confirm(self.video_path, self.frames_path)
+            self.on_confirm(self)
 
+    def process_frame(self, frame): 
+
+        frame = cv2.resize(frame, (640,360))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #Convert from numpy array to PIL image for TKinter 
+        image = ImageTk.PhotoImage(image=Image.fromarray(frame))
+
+        return image 
+    
     def get_video_path(self):
         """
         Returns the path where video is stored
@@ -68,3 +82,7 @@ class Video:
         Returns the path where frames are stored
         """
         return self.frames_path
+
+    def get_coordinates(self): 
+
+        return self.coordinates 
