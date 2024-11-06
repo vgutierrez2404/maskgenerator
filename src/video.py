@@ -18,7 +18,7 @@ class Video:
         self.paused = False
         self.update_delay = 30 
         self.on_confirm = None 
-
+        self.on_confirmed_frames = None
         # For the predictions, the coordinates will be stored in a 
         # dictionary that contains [frame, coordinate]
         self.coordinates = {} 
@@ -61,6 +61,15 @@ class Video:
         if self.on_confirm:
             # self.on_confirm(self.video_path, self.frames_path)
             self.on_confirm(self)
+
+    def on_frames_confirmed(self): 
+        """
+        This function is called when the frames of video are confirmed. 
+        It calls the function in the main app for proceding with the 
+        prediction of the images. 
+        """
+        if self.on_confirmed_frames: 
+            self.on_confirmed_frames(self)
 
     def process_frame(self, frame): 
 

@@ -7,7 +7,7 @@ import os
 from src.video import Video
 
 class FrameViewer: 
-    def __init__(self, root, video: Video):
+    def __init__(self, root, video: Video, on_confirm=None):
         self.root = root
         self.root.title("Frame Viewer - Select Point")
         
@@ -20,6 +20,7 @@ class FrameViewer:
         self.frame_panel = tk.Label(self.root)
         self.frame_panel.pack()
         self.current_frame = None
+        self.on_confirm = on_confirm
         
         # Buttons associated with the frame viewer
         btn_frame = tk.Frame(self.root)
@@ -30,6 +31,9 @@ class FrameViewer:
         
         self.next_button = tk.Button(btn_frame, text="Next Frame", command=self.next_frame)
         self.next_button.grid(row=0, column=1)
+
+        self.confirm_button = tk.Button(btn_frame, text="Confirm frames", command=self.confirm_frames)
+        self.confirm_button.grid(row=0, column=2)
 
         # Load and display the initial frame
         self.load_frame(self.frame_index)
@@ -57,6 +61,7 @@ class FrameViewer:
         self.root.title(f"Frame Viewer - Frame {index}")
         
     def on_click(self, event):
+
         # Capture and store coordinates of the clicked point for the current frame
         x, y = event.x, event.y
         self.coordinates[self.frame_index] = (x, y) # coordinates should be in the frames of the video, not the frame_viewer. 
@@ -64,6 +69,7 @@ class FrameViewer:
         print(f"Selected point on frame {self.frame_index}: ({x}, {y})")
 
     def next_frame(self):
+
         # Move to the next frame, if available
         self.frame_index += 1
         self.load_frame(self.frame_index)
@@ -73,6 +79,21 @@ class FrameViewer:
         if self.frame_index > 0:
             self.frame_index -= 1
             self.load_frame(self.frame_index)
+
+    def confirm_frames(self): 
+        # Now i select the coordinates int eh video. 
+        print(f"selected coordinates from frames{self.video.get_coordinates()}")
+        
+        if self.on_confirm: 
+            self.on_confirm(self.video.coordinates)
+
+    def check_confirmed_frames(self): 
+        """
+        If the selected frames have been confirmed by the user, the window
+        of the frame_viewer should be destroyed. 
+        """
+        if self.video.on_confirmed_frames: 
+            self.root.destroy()   
 
     def get_coordinates(self):
         # Return the selected coordinates for each frame

@@ -16,6 +16,13 @@ from src.predictor import Predictor
 import src.functions as fnc
 from src.video import Video 
 
+######################
+#
+# Sources: https://colab.research.google.com/github/facebookresearch/sam2/blob/main/notebooks/video_predictor_example.ipynb#scrollTo=1a572ea9-5b7e-479c-b30c-93c38b121131
+#          https://github.com/facebookresearch/sam2#installation
+#
+######################
+
 # Global flag for root window
 main_root = None
 
@@ -110,9 +117,23 @@ def on_video_confirmed(video:Video):
 
     # Create a new window for the frame_viewer. 
     frame_viewer_root = tk.Tk()
-    frame_viewer = FrameViewer(frame_viewer_root, video)  # output_dir is the frame directory
+    frame_viewer = FrameViewer(frame_viewer_root, video, on_confirm=on_frames_confirmed)  # output_dir is the frame directory
+
+    frame_viewer.check_confirmed_frames() # This function should be deleted in the future - no information 
+    frame_viewer.video.on_confirmed_frames = on_frames_confirmed
     frame_viewer_root.mainloop()   
 
+def on_frames_confirmed(video:Video):
+    """"
+    When the frames are confirmed, we throw the prediction on the coordinates 
+    of the frames passed. 
+    """
+    # First we check what is the device where we are doing the predictions. 
+    device = check_device_used()    
+    print(f"used device{device}")
+    predictor = Predictor(device=device)
+
+    pass
 
 def main():
     global main_root
