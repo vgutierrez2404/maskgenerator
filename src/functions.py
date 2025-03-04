@@ -49,9 +49,7 @@ def slice_video(video_path, output_dir):
         print(f"Found {len(frame_names)} frames in {output_dir} directory.")
 
     except subprocess.CalledProcessError as e:
-        print("An error occurred while running ffmpeg:", e)
-
-    return frame_names
+        print("An error occurred while running ffmpeg:", e)  
 
 
 def show_mask(mask, ax, obj_id=None, random_color=False):

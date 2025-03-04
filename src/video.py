@@ -4,6 +4,8 @@ import cv2
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
+from src.functions import find_frames
+
 
 class Video: 
 
@@ -95,3 +97,11 @@ class Video:
     def get_coordinates(self): 
 
         return self.coordinates 
+
+    def get_frame_names(self): 
+        """
+        Finds all the frames in the frames path of the video. 
+        """
+        frame_names = find_frames(self.frames_path)
+        
+        return frame_names
