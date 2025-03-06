@@ -154,7 +154,7 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
-    inference_state = predictor.init_state(video_path=video.frames_path)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
+    inference_state = predictor.init_state(video_path=video.frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
 
     points = np.array(list(video.coordinates.values()), dtype=np.float32)
     
@@ -175,7 +175,7 @@ def on_frames_confirmed(video:Video):
     fnc.show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
 
     # now i want to propagate the first mask through the entire video
-# run propagation throughout the video and collect the results in a dict
+    # run propagation throughout the video and collect the results in a dict
     video_segments = {}  # video_segments contains the per-frame segmentation results
     for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
         video_segments[out_frame_idx] = {
