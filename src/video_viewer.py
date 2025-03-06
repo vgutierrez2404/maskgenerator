@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import os 
 
 from src.video import Video
-
+        
 class VideoViewer: 
     def __init__(self, root, video:Video): 
         self.root = root
@@ -13,7 +13,7 @@ class VideoViewer:
 
         # Panel for displaying frames 
         self.video_panel = tk.Label(self.root)
-        self.video_panel.pack()
+        self.video_panel.pack() 
 
         # Buttons associated with the window used 
         button_frame = tk.Frame(self.root)

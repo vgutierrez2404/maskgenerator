@@ -6,7 +6,6 @@ from PIL import Image, ImageTk
 
 from src.functions import find_frames
 
-
 class Video: 
 
     def __init__(self, results_dir) -> None:
@@ -25,7 +24,6 @@ class Video:
         # dictionary that contains [frame, coordinate]
         self.coordinates = {} 
 
-    
     def set_output_dir(self): 
         self.output_dir = os.path.join(self.results_dir, self.video_name)
         self.frames_path = self.output_dir # este paso creo que no hace falta. 

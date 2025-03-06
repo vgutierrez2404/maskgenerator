@@ -1,7 +1,8 @@
 import tkinter as tk
+from tkinter import filedialog
 import numpy as np 
 import os 
-from PIL import Image, ImageTk
+from PIL import Image
 import torch 
 import sys
 import matplotlib.pyplot as plt
@@ -148,41 +149,56 @@ def on_frames_confirmed(video:Video):
 
     # generate and initialize the predictor
     # predictor = Predictor(device=device) 
-    checkpoints = "./sam2.1_hiera_large.pt"
-    model_config = "./sam2.1_hiera_l.yaml"
-    predictor = build_sam2_video_predictor(model_config, checkpoints, device=device)
-    inference_state = predictor.init_state(video_path=video.frames_path)   
+    checkpoints = os.path.join(os.getcwd(), "sam2/checkpoints", "sam2.1_hiera_small.pt") # video.model.model_checkpoints
+    model_config = "sam2.1_hiera_s.yaml"
+    config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
+    predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
+
+    inference_state = predictor.init_state(video_path=video.frames_path)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
 
     points = np.array(list(video.coordinates.values()), dtype=np.float32)
     
     labels = np.ones(points.shape[0], dtype=np.int32)
     # these are the indeces of the frames used in the inference
-    frame_index = {int(k): v for k,v in video.coordinates.items()}
+    frame_index = 0# = {int(k): v for k,v in video.coordinates.items()}
     ann_obj_id = 1
 
-    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
-    inference_state=inference_state,
-    frame_idx=frame_index,
-    obj_id=ann_obj_id,
-    points=points,
-    labels=labels,)
+    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels,)
 
     frame_names = video.get_frame_names()
     # Lets see if this works properly
     
     plt.figure(figsize=(9, 6))
     plt.title(f"frame {frame_index}")
-    plt.imshow(Image.open(os.path.join(video.video_path, frame_names[frame_index])))
+    plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[frame_index])))
     fnc.show_points(points, labels, plt.gca())
     fnc.show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
 
+    # now i want to propagate the first mask through the entire video
+# run propagation throughout the video and collect the results in a dict
+    video_segments = {}  # video_segments contains the per-frame segmentation results
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
+        video_segments[out_frame_idx] = {
+            out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+            for i, out_obj_id in enumerate(out_obj_ids)
+        }
 
+    # render the segmentation results every few frames
+    vis_frame_stride = 30
+    plt.close("all")
+    for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
+        plt.figure(figsize=(6, 4))
+        plt.title(f"frame {out_frame_idx}")
+        plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
+        for out_obj_id, out_mask in video_segments[out_frame_idx].items():
+            fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
+    
 def main():
     global main_root    
     main_root = tk.Tk()
 
     res_dir = "./results"
-    os.makedirs(res_dir, exist_ok=True)
+    os.makedirs("./results", exist_ok=True)
 
     # This code will be used before the refactor. 
     # Create an empty video and pass it to the video viewer 
