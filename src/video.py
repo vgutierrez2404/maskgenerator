@@ -20,6 +20,7 @@ class Video:
         self.update_delay = 30 
         self.on_confirm = None 
         self.on_confirmed_frames = None
+        self.frame_size = (0,0)
         # For the predictions, the coordinates will be stored in a 
         # dictionary that contains [frame, coordinate]
         self.coordinates = {} 
@@ -52,7 +53,10 @@ class Video:
         # Start the video preview
         self.playing = True
         self.paused = False
-
+        
+        # Get the dimensions of the video in case they change 
+        self.frame_size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    
     def video_confirmed(self): 
         
         self.playing = False

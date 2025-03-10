@@ -64,29 +64,21 @@ class FrameViewer:
 
         # Capture and store coordinates of the clicked point for the current frame
         x, y = event.x, event.y
-        self.coordinates[self.frame_index] = (x, y) # coordinates should be in the frames of the video, not the frame_viewer. 
-        self.video.coordinates[self.frame_index] = (x, y)
-        print(f"Selected point on frame {self.frame_index}: ({x}, {y})")
+        # self.coordinates[self.frame_index] = (x, y) # coordinates should be in the frames of the video, not the frame_viewer. 
+        # self.video.coordinates[self.frame_index] = (x, y)
+        # print(f"Selected point on frame {self.frame_index}: ({x}, {y})")
 
-        # # Get the actual dimensions of the image and panel
-        # frame_width, frame_height = self.current_frame.width(), self.current_frame.height()
-        # img_height, img_width = self.video.frame_size  # Assuming you store original size
+        # Get the actual dimensions of the image and panel
+        frame_width, frame_height = self.current_frame.width(), self.current_frame.height()
+        img_height, img_width = self.video.frame_size  # Assuming you store original size
         
-        # # Scale coordinates to original frame size
-        # scaled_x = int((x / frame_width) * img_width)
-        # scaled_y = int((y / frame_height) * img_height)
+        # Scale coordinates to original frame size
+        scaled_x = int((x / frame_width) * img_width)
+        scaled_y = int((y / frame_height) * img_height)
 
-        # self.coordinates[self.frame_index] = (scaled_x, scaled_y)
-        # self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)    # Get the actual dimensions of the image and panel
-        # frame_width, frame_height = self.current_frame.width(), self.current_frame.height()
-        # img_height, img_width = self.video.frame_size  # Assuming you store original size
-        
-        # # Scale coordinates to original frame size
-        # scaled_x = int((x / frame_width) * img_width)
-        # scaled_y = int((y / frame_height) * img_height)
-
-        # self.coordinates[self.frame_index] = (scaled_x, scaled_y)
-        # self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)
+        self.coordinates[self.frame_index] = (scaled_x, scaled_y)
+        self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)    # Get the actual dimensions of the image and panel
+     
 
     def next_frame(self):
 
