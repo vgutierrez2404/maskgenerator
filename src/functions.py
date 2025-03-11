@@ -29,6 +29,7 @@ def slice_video(video_path, output_dir):
     # Generate output directory if it does not exist. 
     os.makedirs(output_dir, exist_ok=True)
 
+    frame_names = []
     # The ffmpge commnad that will be used to slice the video. Retrieved
     # from META notebook. 
     ffmpeg_command = [
@@ -36,7 +37,7 @@ def slice_video(video_path, output_dir):
         '-i', video_path,
         '-q:v', '2',  # Quality factor for image
         '-start_number', '0',  # Start numbering frames from 0
-        os.path.join(output_dir, '%05d.jpg')  # Output pattern for frames
+        os.path.join(output_dir, 'frame_%05d.jpg')  # Output pattern for frames
     ]
 
     try:   
@@ -45,16 +46,19 @@ def slice_video(video_path, output_dir):
             print(f"Frames extracted to {output_dir} successfully. ")
 
         frame_names = find_frames(output_dir)
-
         print(f"Found {len(frame_names)} frames in {output_dir} directory.")
-
+        
+        return frame_names 
+    
     except subprocess.CalledProcessError as e:
         print("An error occurred while running ffmpeg:", e)  
+        return frame_names 
 
-
-def show_mask(mask, ax, obj_id=None, random_color=False):
+def show_mask(mask, ax, obj_id=None, random_color=False, black_mask=True):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
+    elif black_mask:     
+        color = np.array([0, 0, 0, 1])
     else:
         cmap = plt.get_cmap("tab10")
         cmap_idx = 0 if obj_id is None else obj_id

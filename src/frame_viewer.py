@@ -13,7 +13,7 @@ class FrameViewer:
         
         # Directory containing the frames
         self.video = video
-        self.frames_dir = self.video.frames_path
+        self.frames_dir = self.video.selected_frames_path if self.video.selected_frames_path is not None else self.video.frames_path
         self.frame_index = 0  # Start with the first frame
         self.coordinates = {}  # Dictionary of points selected in each of the frames.
         

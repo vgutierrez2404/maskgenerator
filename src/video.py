@@ -1,9 +1,8 @@
-import numpy as np 
 import os 
 import cv2  
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 from PIL import Image, ImageTk
-
+import subprocess
 from src.functions import find_frames
 
 class Video: 
@@ -14,6 +13,7 @@ class Video:
         self.video_path = None 
         self.video_name = None
         self.frames_path = None # frames_path should be the same as the output directory. 
+        self.selected_frames_path = None
         self.cap = None 
         self.playing = False 
         self.paused = False
@@ -56,7 +56,7 @@ class Video:
         
         # Get the dimensions of the video in case they change 
         self.frame_size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    
+
     def video_confirmed(self): 
         
         self.playing = False
@@ -104,6 +104,25 @@ class Video:
         """
         Finds all the frames in the frames path of the video. 
         """
-        frame_names = find_frames(self.frames_path)
+        frame_names = find_frames(self.selected_frames_path) if self.selected_frames_path is not None else find_frames(self.frames_path)
         
         return frame_names
+
+    def get_selected_frames(self, selected_frames): 
+        """"
+        Copies the selected frames from preprocessing into a selected_frames 
+        folder. It has to be this way bc o sam2  way of initializing frames, where
+        you have to pass as an argument the absolute path of a frames dir. 
+        
+        """
+        selected_frames_path = os.path.join(self.frames_path, "selected_frames")
+        
+        os.makedirs(selected_frames_path, exist_ok=True)
+        
+        for index, frame in enumerate(selected_frames): 
+            src_path = os.path.join(self.frames_path, frame)
+            dst_path = os.path.join(selected_frames_path, frame)
+
+            subprocess.run(f'cp "{src_path}" "{dst_path }" ', shell=True, check=True) 
+
+        self.selected_frames_path = selected_frames_path

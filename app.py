@@ -16,6 +16,7 @@ from src.frame_viewer import FrameViewer
 from sam2.build_sam import build_sam2_video_predictor
 from src.predictor import Predictor
 import src.functions as fnc
+import src.utils.preprocessing as preprocessing
 from src.video import Video 
 from sam2.build_sam import build_sam2_video_predictor
 
@@ -116,8 +117,11 @@ def on_video_confirmed(video:Video):
         main_root.destroy()
 
     # Slice the video into frames
-    fnc.slice_video(video.get_video_path(), video.get_frames_path())
-
+    frame_names = fnc.slice_video(video.get_video_path(), video.get_frames_path())
+    # We can add a process video frames in order to not use all the available ones. 
+    selected_frames = preprocessing.paralelize_list_processing(8, os.path.dirname(video.video_path), frame_names, 8)
+    # falta meter los selected frames en alguna parte 
+    video.get_selected_frames(selected_frames)
     # Create a new window for the frame_viewer. 
     frame_viewer_root = tk.Tk()
     frame_viewer = FrameViewer(frame_viewer_root, video, on_confirm=on_frames_confirmed)  # output_dir is the frame directory
@@ -154,7 +158,9 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
-    inference_state = predictor.init_state(video_path=video.frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
+    # que para hacer inferencia haya que pasarle el path de una carpeta de frames me parece una mierda, mejor sería pasarle los paths de los frames, pero bueno. 
+    # esto hace que tenga que tener dos carpetas, una con los frames seleccionados y otra con todos los frames... 
+    inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
 
     points = np.array(list(video.coordinates.values()), dtype=np.float32)
     
