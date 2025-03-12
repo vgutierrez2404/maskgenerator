@@ -6,6 +6,7 @@ from PIL import Image
 import torch 
 import sys
 import matplotlib.pyplot as plt
+from tkinter import messagebox
 
 # Append the absolute path of the sam2 directory to sys.path
 sys.path.insert(0, os.path.abspath("./sam2"))
@@ -118,10 +119,20 @@ def on_video_confirmed(video:Video):
 
     # Slice the video into frames
     frame_names = fnc.slice_video(video.get_video_path(), video.get_frames_path())
-    # We can add a process video frames in order to not use all the available ones. 
-    selected_frames = preprocessing.paralelize_list_processing(8, os.path.dirname(video.video_path), frame_names, 8)
-    # falta meter los selected frames en alguna parte 
-    video.get_selected_frames(selected_frames)
+
+    # check if a subfolder with the selected frames exists. 
+    selected_frames_path = os.path.join(video.frames_path, "selected_frames")
+    if os.path.exists(selected_frames_path) and os.listdir(selected_frames_path):
+        process = messagebox.askyesno( title="Process video?", message="A selection of frames already exists. Would you like to process again the video?")
+        video.selected_frames_path = selected_frames_path   
+
+    if process or not os.path.exists(selected_frames_path): # si se ha seleccionado processar o no existe la carpeta selectedframes
+        # We can add a process video frames in order to not use all the available ones. 
+        selected_frames = preprocessing.paralelize_list_processing(8, os.path.dirname(video.video_path), frame_names, 8)
+        # falta meter los selected frames en alguna parte 
+        video.get_selected_frames(selected_frames, selected_frames_path)
+
+
     # Create a new window for the frame_viewer. 
     frame_viewer_root = tk.Tk()
     frame_viewer = FrameViewer(frame_viewer_root, video, on_confirm=on_frames_confirmed)  # output_dir is the frame directory
@@ -190,14 +201,21 @@ def on_frames_confirmed(video:Video):
         }
 
     # render the segmentation results every few frames
+    masks_path = os.path.join(video.frames_path, "masks")   
     vis_frame_stride = 30
     plt.close("all")
     for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
         plt.figure(figsize=(6, 4))
-        plt.title(f"frame {out_frame_idx}")
+        # plt.title(f"frame {out_frame_idx}")
         plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-            fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
+            fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
+        plt.savefig(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.png"))
+
+    for out_frame_idx in range(0, len(frame_names)): 
+        for out_obj_id, out_mask in video_segments[out_frame_idx].items():
+            image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
+            fnc.add_mask_and_save_image(masks_path, image, out_mask, out_obj_id, out_frame_idx)
     
 def main():
     global main_root    

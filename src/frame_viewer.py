@@ -82,8 +82,8 @@ class FrameViewer:
 
     def next_frame(self):
 
-        # Move to the next frame, if available
-        self.frame_index += 1
+        # Move to the next frame, if available 
+        self.frame_index += 1 # TODO: if we have a list of selected frames, the following index is not +1. 
         self.load_frame(self.frame_index)
 
     def previous_frame(self):

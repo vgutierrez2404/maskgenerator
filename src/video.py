@@ -108,18 +108,17 @@ class Video:
         
         return frame_names
 
-    def get_selected_frames(self, selected_frames): 
+    def get_selected_frames(self, selected_frames:list[str], selected_frames_path:str): 
         """"
         Copies the selected frames from preprocessing into a selected_frames 
         folder. It has to be this way bc o sam2  way of initializing frames, where
         you have to pass as an argument the absolute path of a frames dir. 
         
         """
-        selected_frames_path = os.path.join(self.frames_path, "selected_frames")
         
         os.makedirs(selected_frames_path, exist_ok=True)
         
-        for index, frame in enumerate(selected_frames): 
+        for frame in selected_frames: 
             src_path = os.path.join(self.frames_path, frame)
             dst_path = os.path.join(selected_frames_path, frame)
 
