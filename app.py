@@ -7,6 +7,7 @@ import torch
 import sys
 import matplotlib.pyplot as plt
 from tkinter import messagebox
+from tqdm import tqdm 
 
 # Append the absolute path of the sam2 directory to sys.path
 sys.path.insert(0, os.path.abspath("./sam2"))
@@ -202,6 +203,8 @@ def on_frames_confirmed(video:Video):
 
     # render the segmentation results every few frames
     masks_path = os.path.join(video.frames_path, "masks")   
+    os.makedirs(masks_path, exist_ok=True)  
+
     vis_frame_stride = 30
     plt.close("all")
     for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
@@ -212,10 +215,10 @@ def on_frames_confirmed(video:Video):
             fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
         plt.savefig(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.png"))
 
-    for out_frame_idx in range(0, len(frame_names)): 
+    for out_frame_idx in tqdm(range(0, len(frame_names))): 
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
             image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
-            fnc.add_mask_and_save_image(masks_path, image, out_mask, out_obj_id, out_frame_idx)
+            fnc.add_mask_and_save_image(masks_path, image, out_mask, out_frame_idx)
     
 def main():
     global main_root    
