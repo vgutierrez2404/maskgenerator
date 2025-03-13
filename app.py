@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import filedialog
 import numpy as np 
 import os 
 from PIL import Image
@@ -16,11 +15,9 @@ sys.path.insert(0, os.path.abspath("./sam2"))
 from src.video_viewer import VideoViewer
 from src.frame_viewer import FrameViewer
 from sam2.build_sam import build_sam2_video_predictor
-from src.predictor import Predictor
 import src.functions as fnc
 import src.utils.preprocessing as preprocessing
 from src.video import Video 
-from sam2.build_sam import build_sam2_video_predictor
 
 ######################
 #
@@ -95,12 +92,12 @@ def on_video_confirmed(video:Video):
 
 
     # Create a new window for the frame_viewer. 
-    frame_viewer_root = tk.Tk()
-    frame_viewer = FrameViewer(frame_viewer_root, video, on_confirm=on_frames_confirmed)  # output_dir is the frame directory
+    main_root = tk.Tk()
+    frame_viewer = FrameViewer(main_root, video, on_confirm=on_frames_confirmed)  # output_dir is the frame directory
 
     frame_viewer.check_confirmed_frames() # This function should be deleted in the future - no information 
     frame_viewer.video.on_confirmed_frames = on_frames_confirmed
-    frame_viewer_root.mainloop()   
+    main_root.mainloop()   
 
 
 def on_frames_confirmed(video:Video):
@@ -159,7 +156,7 @@ def on_frames_confirmed(video:Video):
         image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
         
         # visualization as in the sam demo  
-        if out_frame_idx % vis_frame_stride == 0: 
+        if out_frame_idx % vis_frame_stride == 0: # this does not work in the ffirst video. 
             plt.figure(figsize=(6, 4))
             plt.title(f"frame {out_frame_idx}")
             plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
@@ -171,14 +168,15 @@ def on_frames_confirmed(video:Video):
                 fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
 
     load_diff_video = messagebox.askyesno(title="Load different video?", message="Would you like to load a different video?")   
+    main_root.destroy()
     if load_diff_video:
-        main_root.quit() 
         # When eveything finishes, reset the state of the predictor in order to not deallocate the memory. 
         predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
         # if its the same video, frames are stored in cache. 
         main_window()   
 
 def main_window():
+    global main_root
     main_root = tk.Tk()
     res_dir = "./results"
     video = Video(res_dir)
