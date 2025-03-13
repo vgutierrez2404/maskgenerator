@@ -173,7 +173,9 @@ def on_frames_confirmed(video:Video):
         # When eveything finishes, reset the state of the predictor in order to not deallocate the memory. 
         predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
         # if its the same video, frames are stored in cache. 
-        main_window()   
+        main_window()
+    else: 
+        sys.exit(0) 
 
 def main_window():
     global main_root
