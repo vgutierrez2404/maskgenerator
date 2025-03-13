@@ -207,19 +207,30 @@ def on_frames_confirmed(video:Video):
 
     vis_frame_stride = 30
     plt.close("all")
-    for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
-        plt.figure(figsize=(6, 4))
-        # plt.title(f"frame {out_frame_idx}")
-        plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
-        for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-            fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
-        plt.savefig(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.png"))
+    
+    # for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
+    #     plt.figure(figsize=(6, 4))
+    #     plt.title(f"frame {out_frame_idx}")
+    #     plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
+    #     for out_obj_id, out_mask in video_segments[out_frame_idx].items():
+    #         fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
 
     for out_frame_idx in tqdm(range(0, len(frame_names))): 
+        image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
+        
+        # visualization as in the sam demo  
+        if out_frame_idx % vis_frame_stride == 0: 
+            plt.figure(figsize=(6, 4))
+            plt.title(f"frame {out_frame_idx}")
+            plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
+
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-            image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
             fnc.add_mask_and_save_image(masks_path, image, out_mask, out_frame_idx)
-    
+            
+            if out_frame_idx % vis_frame_stride == 0: # visualization as in the sam demo 
+                fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
+
+   
 def main():
     global main_root    
     main_root = tk.Tk()

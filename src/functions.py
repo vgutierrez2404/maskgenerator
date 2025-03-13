@@ -100,4 +100,4 @@ def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_fra
     res_image = cv2.bitwise_and(np.asarray(image),np.asarray(image), mask=mask_image)
 
     masked_image = Image.fromarray(res_image)
-    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx}%05.jpg"))
+    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.jpg")) # this is resetting the index of the frames!! CARE
