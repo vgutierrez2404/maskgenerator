@@ -68,46 +68,6 @@ def check_device_used():
 
     return device
 
-# def on_video_confirmed(video_path, output_dir): 
-#     global main_root
-
-#     print(f"Video confirmed: {video_path}")
-    
-#     # Slice the video into frames. This should only happen in the 
-#     # case that the video is not already sliced. 
-#     frame_names = fnc.slice_video(video_path, output_dir)
-
-#     # Destroy the previsualizer when the video is confirmed. 
-#     if main_root is not None:
-#         main_root.destroy()
-    
-#     # Create a new Tkinter root window for the frame viewer
-#     frame_root = tk.Tk()
-#     frame_viewer = FrameViewer(frame_root, output_dir)  # output_dir is the frame directory
-#     frame_root.mainloop()   
-
-#     # TODO: esto hay que llevarlo a otra funcion - do_prediction() o algo asi. 
-#     device = check_device_used()
-#     predictor = Predictor(device=device) # this is the initialization of the SAM predictor. 
-
-#     inference_state = predictor.init_state(video_path=output_dir) # the direction of the video is the output directory?? 
-#     labels = np.array([1], np.int32) 
-#     points = frame_viewer.get_coordinates()
-#     print(f"The selected coordinates in the video are: {points}")
-
-#     ann_frame_idx = 0  # the frame index we interact with
-#     ann_obj_id = 1 
-
-#     _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(
-#     inference_state=inference_state,
-#     frame_idx=ann_frame_idx,
-#     obj_id=ann_obj_id,
-#     points=points,
-#     labels=labels,
-#     )
-
-#     fnc.show_mask_on_frame(ann_frame_idx, output_dir, frame_names, points, labels, out_mask_logits, out_obj_ids)
-
 def on_video_confirmed(video:Video):
 
     global main_root
@@ -143,17 +103,6 @@ def on_video_confirmed(video:Video):
     frame_viewer_root.mainloop()   
 
 
-def reset_predictor_state(predictor:Predictor, inferance_state): 
-    """
-    Note: if you have run any previous tracking using this inference_state, please reset it first via reset_state.
-
-    (The cell below is just for illustration; it's not needed to call reset_state here as this inference_state is 
-    just freshly initialized above.)"""
-
-    predictor.reset_state(inferance_state)
-
-
-
 def on_frames_confirmed(video:Video):
     """"
     When the frames are confirmed, we throw the prediction on the coordinates 
@@ -170,6 +119,11 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
+
+    # Should diferenciate between large videos and small videos. Large videos 
+    # should be load to the predictor in batches and pass throught the next batch 
+    # the mask that has been generated and the attention??  
+
     # que para hacer inferencia haya que pasarle el path de una carpeta de frames me parece una mierda, mejor sería pasarle los paths de los frames, pero bueno. 
     # esto hace que tenga que tener dos carpetas, una con los frames seleccionados y otra con todos los frames... 
     inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
@@ -178,19 +132,12 @@ def on_frames_confirmed(video:Video):
     
     labels = np.ones(points.shape[0], dtype=np.int32)
     # these are the indeces of the frames used in the inference
-    frame_index = 0# = {int(k): v for k,v in video.coordinates.items()}
+    frame_index = 0
     ann_obj_id = 1
 
-    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels,)
+    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
 
     frame_names = video.get_frame_names()
-    # Lets see if this works properly
-    
-    plt.figure(figsize=(9, 6))
-    plt.title(f"frame {frame_index}")
-    plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[frame_index])))
-    fnc.show_points(points, labels, plt.gca())
-    fnc.show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
 
     # now i want to propagate the first mask through the entire video
     # run propagation throughout the video and collect the results in a dict
@@ -208,13 +155,6 @@ def on_frames_confirmed(video:Video):
     vis_frame_stride = 30
     plt.close("all")
     
-    # for out_frame_idx in range(0, len(frame_names), vis_frame_stride):
-    #     plt.figure(figsize=(6, 4))
-    #     plt.title(f"frame {out_frame_idx}")
-    #     plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
-    #     for out_obj_id, out_mask in video_segments[out_frame_idx].items():
-    #         fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
-
     for out_frame_idx in tqdm(range(0, len(frame_names))): 
         image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
         
@@ -230,7 +170,24 @@ def on_frames_confirmed(video:Video):
             if out_frame_idx % vis_frame_stride == 0: # visualization as in the sam demo 
                 fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
 
-   
+    load_diff_video = messagebox.askyesno(title="Load different video?", message="Would you like to load a different video?")   
+    if load_diff_video:
+        main_root.quit() 
+        # When eveything finishes, reset the state of the predictor in order to not deallocate the memory. 
+        predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
+        # if its the same video, frames are stored in cache. 
+        main_window()   
+
+def main_window():
+    main_root = tk.Tk()
+    res_dir = "./results"
+    video = Video(res_dir)
+
+    video_viewer = VideoViewer(main_root, video)
+    video_viewer.video.on_confirm = on_video_confirmed
+
+    main_root.mainloop()
+
 def main():
     global main_root    
     main_root = tk.Tk()
