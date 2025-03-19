@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import filedialog  
 import numpy as np 
 import os 
 from PIL import Image
@@ -74,10 +75,7 @@ def on_video_confirmed(video:Video):
     # Destroy the previsualizer when the video is confirmed. 
     if main_root is not None:
         main_root.destroy()
-
-    # Slice the video into frames
-    frame_names = fnc.slice_video(video.get_video_path(), video.get_frames_path())
-
+        
     # check if a subfolder with the selected frames exists. 
     selected_frames_path = os.path.join(video.frames_path, "selected_frames")
     if os.path.exists(selected_frames_path) and os.listdir(selected_frames_path):
@@ -86,6 +84,8 @@ def on_video_confirmed(video:Video):
 
     if process or not os.path.exists(selected_frames_path): # si se ha seleccionado processar o no existe la carpeta selectedframes
         # We can add a process video frames in order to not use all the available ones. 
+        # Slice the video into frames
+        frame_names = fnc.slice_video(video.get_video_path(), video.get_frames_path())
         selected_frames = preprocessing.paralelize_list_processing(8, os.path.dirname(video.video_path), frame_names, 8)
         # falta meter los selected frames en alguna parte 
         video.get_selected_frames(selected_frames, selected_frames_path)
@@ -188,18 +188,40 @@ def main_window():
 
     main_root.mainloop()
 
+def select_input_type(video:Video): 
+    "return bool"
+    choice = messagebox.askquestion("Select Input", "Do you want to select a video file? Click 'No' to select a folder.")
+    selection_type = True if choice == "yes" else False
+
+    return selection_type
+
 def main():
     global main_root    
     main_root = tk.Tk()
 
     res_dir = "./results"
     os.makedirs("./results", exist_ok=True)
-
-    # This code will be used before the refactor. 
-    # Create an empty video and pass it to the video viewer 
+ 
+    # Create an empty video object with no properties. It will be later update by the videoViewer/frameViewer depend on the input. 
     video = Video(res_dir)
-    video_viewer = VideoViewer(main_root, video)
-    video_viewer.video.on_confirm = on_video_confirmed
+
+    selection_type = select_input_type(video)
+    if selection_type: 
+        video_viewer = VideoViewer(main_root, video)
+        video_viewer.video.on_confirm = on_video_confirmed
+    else: 
+        # in case that we select a folder of frames, we display directly the frame viewer.
+        frames_path = filedialog.askdirectory() 
+        video.input_type = "selected_frames"
+        video.frames_path = frames_path
+        video.selected_frames_path = frames_path
+        video.video_path = frames_path 
+        video.get_frame_size()
+
+        frame_viewer = FrameViewer(main_root, video, on_confirm=on_frames_confirmed)
+        frame_viewer.check_confirmed_frames()
+        frame_viewer.video.on_confirmed_frames = on_frames_confirmed
+
 
     main_root.mainloop()
 

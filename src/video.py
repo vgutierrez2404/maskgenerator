@@ -7,13 +7,13 @@ from src.functions import find_frames
 
 class Video: 
 
-    def __init__(self, results_dir) -> None:
+    def __init__(self, results_dir=None, selected_frames_path=None) -> None:
         
         self.results_dir = results_dir
         self.video_path = None 
         self.video_name = None
         self.frames_path = None # frames_path should be the same as the output directory. 
-        self.selected_frames_path = None
+        self.selected_frames_path = selected_frames_path
         self.cap = None 
         self.playing = False 
         self.paused = False
@@ -21,6 +21,8 @@ class Video:
         self.on_confirm = None 
         self.on_confirmed_frames = None
         self.frame_size = (0,0)
+        self.input_type = None   
+
         # For the predictions, the coordinates will be stored in a 
         # dictionary that contains [frame, coordinate]
         self.coordinates = {} 
@@ -37,7 +39,7 @@ class Video:
         # Update the video path of the Video object to the new selected video. 
         self.video_path = video_path
         self.video_name = os.path.splitext(os.path.basename(self.video_path))[0] 
-         
+        
         self.set_output_dir() # now the video has an output directory where the frames will be stored. 
 
         # Stop current video if playing and open the new video file
@@ -54,13 +56,14 @@ class Video:
         self.playing = True
         self.paused = False
         
-        # Get the dimensions of the video in case they change 
-        self.frame_size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        self.get_frame_size(self)
 
     def video_confirmed(self): 
         
-        self.playing = False
-        self.cap.release()
+        
+        if self.cap is not None: # in case frames are selected instead of a video  
+            self.cap.release()
+            self.playing = False
         # Notify main application that video is confirmed
         if self.on_confirm:
             # self.on_confirm(self.video_path, self.frames_path)
@@ -125,3 +128,13 @@ class Video:
             subprocess.run(f'cp "{src_path}" "{dst_path }" ', shell=True, check=True) 
 
         self.selected_frames_path = selected_frames_path
+
+    def get_frame_size(self): 
+        """
+        Get the dimensions of the video in case they change 
+        """
+        if self.input_type == "video": 
+            self.frame_size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        else: 
+            self.frame_size = cv2.imread(os.path.join(self.frames_path, "00000.jpg")).shape[1::-1]
+    

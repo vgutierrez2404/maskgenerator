@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np 
 from PIL import Image
 import os 
+import random 
 import subprocess
 import cv2
 
@@ -101,3 +102,38 @@ def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_fra
 
     masked_image = Image.fromarray(res_image)
     masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.jpg")) # this is resetting the index of the frames!! CARE
+
+def check_for_preprocesed_frames(): 
+    """ before loading a video to the app check if some other application 
+    has preprocessed the frames (adding metadata for example)
+    
+    The idea of using this for DEQ probably requieres that the metadata has not 
+    been added so it should be added in the middle of the pipeline of processing. 
+
+    returns: 
+        - bool: true if the folder exists and has frames. 
+    """
+    exist_processed_frames = False
+    # we check if the folder selected_frames exists and contains frames. 
+    if os.path.exists("./selected_frames") and (len(os.listdir("./selected_frames")) > 0):
+        exist_processed_frames = True   
+        frames_list = os.listdir("./selected_frames")
+        number_of_frames = len(frames_list)
+        print(f"Found {number_of_frames} frames in the directory")
+        
+        # https://exiftool.org/examples.html 
+        # for checking if it has the frames we select a random sample of 5 frames and 
+        # check if all of them have metadata inside with exiftool. 
+        # if they do, we return true.
+
+        random_frames = random.sample(frames_list, 5)
+        for frame in random_frames: 
+            check_metadata_cdm = "exiftool {}".format(frame)
+            metadata = subprocess.run(check_metadata_cdm, shell=True, stdout=subprocess.PIPE)
+            if not metadata: 
+                exist_processed_frames = False
+                break 
+
+    return exist_processed_frames
+
+    

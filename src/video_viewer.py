@@ -1,9 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import cv2
-from PIL import Image, ImageTk
-import os 
-
 from src.video import Video
         
 class VideoViewer: 
@@ -19,7 +16,7 @@ class VideoViewer:
         button_frame = tk.Frame(self.root)
         button_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        self.video = video # this class should be filled with the commands that are displayed below
+        self.video = video 
         self.playing_video_path = None
 
         self.confirm_button = tk.Button(button_frame, text="Confirm Video", command=self.confirm_video)
@@ -34,8 +31,11 @@ class VideoViewer:
         self.change_video()
 
     def change_video(self): 
+        """ 
+        updates the video viewer with the selected video. 
+        """
 
-        # Ask user to select a new video
+        # Ask user to select a new video 
         new_video_path = filedialog.askopenfilename(filetypes=[("Video Files", "*.mp4 *.avi *.mov")])
         self.playing_video_path = new_video_path
 
@@ -43,13 +43,14 @@ class VideoViewer:
         if not new_video_path:
             if not self.video.video_path:
                 messagebox.showwarning("Warning", "No video selected. Please select a video.")
-            return
+            return  
         
+        self.video.input_type = "video" 
         self.video.video_changed(new_video_path)
 
         self.stop_button.config(text="Stop")
 
-        self.update_video()
+        self.update_video() 
 
     def update_video(self):
 
