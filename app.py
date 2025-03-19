@@ -173,23 +173,12 @@ def on_frames_confirmed(video:Video):
         # When eveything finishes, reset the state of the predictor in order to not deallocate the memory. 
         predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
         # if its the same video, frames are stored in cache. 
-        main_window()
+        main()
     else: 
         sys.exit(0) 
 
-def main_window():
-    global main_root
-    main_root = tk.Tk()
-    res_dir = "./results"
-    video = Video(res_dir)
-
-    video_viewer = VideoViewer(main_root, video)
-    video_viewer.video.on_confirm = on_video_confirmed
-
-    main_root.mainloop()
-
-def select_input_type(video:Video): 
-    "return bool"
+def select_input_type(): 
+    "returns the type of selection that will be done in the main window."
     choice = messagebox.askquestion("Select Input", "Do you want to select a video file? Click 'No' to select a folder.")
     selection_type = True if choice == "yes" else False
 
@@ -209,8 +198,10 @@ def main():
     if selection_type: 
         video_viewer = VideoViewer(main_root, video)
         video_viewer.video.on_confirm = on_video_confirmed
+
     else: 
         # in case that we select a folder of frames, we display directly the frame viewer.
+        # TODO: esto debería esta fuera de la aplicacion principal -> Clean code pls. 
         frames_path = filedialog.askdirectory() 
         video.input_type = "selected_frames"
         video.frames_path = frames_path

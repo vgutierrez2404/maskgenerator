@@ -26,10 +26,12 @@ class FrameViewer:
         btn_frame = tk.Frame(self.root)
         btn_frame.pack()
         
-        self.prev_button = tk.Button(btn_frame, text="Previous Frame", command=self.previous_frame)
+        # self.prev_button = tk.Button(btn_frame, text="Previous Frame", command=self.previous_frame)
+        self.prev_button = tk.Button(btn_frame, text="Previous Frame", command=lambda: self.change_frame(-1))
         self.prev_button.grid(row=0, column=0)
         
-        self.next_button = tk.Button(btn_frame, text="Next Frame", command=self.next_frame)
+        # self.next_button = tk.Button(btn_frame, text="Next Frame", command=self.next_frame)
+        self.next_button = tk.Button(btn_frame, text="Next Frame", command=lambda: self.change_frame(1))
         self.next_button.grid(row=0, column=1)
 
         self.confirm_button = tk.Button(btn_frame, text="Confirm frames", command=self.confirm_frames)
@@ -79,18 +81,26 @@ class FrameViewer:
         self.coordinates[self.frame_index] = (scaled_x, scaled_y)
         self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)    # Get the actual dimensions of the image and panel
      
+    def change_frame(self, direction=1):
+        """
+        Move to the next or previous frame based on the direction.
+        
+        :param direction: 1 for next frame, -1 for previous frame.
+        """
+        frame_names = self.video.get_frame_names()
+        indexes = sorted(int(filename.split(".")[0]) for filename in frame_names)
 
-    def next_frame(self):
+        if self.frame_index in indexes:
+            current_idx = indexes.index(self.frame_index)
+            new_idx = current_idx + direction
 
-        # Move to the next frame, if available 
-        self.frame_index += 1 # TODO: if we have a list of selected frames, the following index is not +1. 
-        self.load_frame(self.frame_index)
+            if 0 <= new_idx < len(indexes):  # Ensure within bounds
+                self.frame_index = indexes[new_idx]
+        else:
+            self.frame_index = indexes[0] if direction == 1 else indexes[-1]  # Default to first or last frame
 
-    def previous_frame(self):
-        # Move to the previous frame, if available
-        if self.frame_index > 0:
-            self.frame_index -= 1
-            self.load_frame(self.frame_index)
+        self.load_frame(self.frame_index)  # Load the frame to the viewer
+
 
     def confirm_frames(self): 
         # Now i select the coordinates int eh video. 

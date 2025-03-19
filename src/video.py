@@ -56,7 +56,7 @@ class Video:
         self.playing = True
         self.paused = False
         
-        self.get_frame_size(self)
+        self.get_frame_size()
 
     def video_confirmed(self): 
         
