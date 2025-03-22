@@ -3,7 +3,7 @@ import cv2
 from tkinter import messagebox
 from PIL import Image, ImageTk
 import subprocess
-from src.functions import find_frames
+from utils.functions import find_frames
 
 class Video: 
 

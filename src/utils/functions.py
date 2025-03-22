@@ -5,6 +5,9 @@ import os
 import random 
 import subprocess
 import cv2
+import re
+from tkinter import messagebox
+
 
 def find_frames(output_dir: str) -> list: 
     """
@@ -39,7 +42,7 @@ def slice_video(video_path, output_dir):
         '-i', video_path,
         '-q:v', '2',  # Quality factor for image
         '-start_number', '0',  # Start numbering frames from 0
-        os.path.join(output_dir, 'frame_%05d.jpg')  # Output pattern for frames
+        os.path.join(output_dir, 'frame_%08d.jpg')  # Output pattern for frames
     ]
 
     try:   
@@ -101,7 +104,7 @@ def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_fra
     res_image = cv2.bitwise_and(np.asarray(image),np.asarray(image), mask=mask_image)
 
     masked_image = Image.fromarray(res_image)
-    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:05d}.jpg")) # this is resetting the index of the frames!! CARE
+    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:08d}.jpg")) # this is resetting the index of the frames!! CARE
 
 def check_for_preprocesed_frames(): 
     """ before loading a video to the app check if some other application 
@@ -136,4 +139,26 @@ def check_for_preprocesed_frames():
 
     return exist_processed_frames
 
+def get_frame_idx(frame:str) -> int:    
+    """
+    Returns the frame index of a frame path string as an integer. 
+    """
+    match = re.search(r'frame_(\d+)', frame)
+    if match:
+        return int(match.group(1))
+    else:
+        raise ValueError("Invalid frame name format")
+
     
+def select_input_type(): 
+    """Returns the type of data which the user will work in the session. 
+    Options: 
+        - yes: the user will work with videos 
+        - no: the user will work with frames. This allows to do preprocessing to the frames (i.e. do a selection
+        of the best ones or the ones that will be used in the application). 
+    """
+    choice = messagebox.askquestion("Select Input", "Do you want to select a video file? Click 'No' to select a folder.")
+    selection_type = True if choice == "yes" else False
+
+    return selection_type
+

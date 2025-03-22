@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath("./sam2"))
 from src.video_viewer import VideoViewer
 from src.frame_viewer import FrameViewer
 from sam2.build_sam import build_sam2_video_predictor
-import src.functions as fnc
+import utils.functions as fnc
 import src.utils.preprocessing as preprocessing
 from src.video import Video 
 
@@ -30,6 +30,9 @@ from src.video import Video
 
 # Global flag for root window
 main_root = None
+
+# Parameters 
+DISPLAY_MASK_IN_IMAGES = False
 
 def check_device_used(): 
     """
@@ -108,6 +111,7 @@ def process_by_batches(video:Video, batch_size:int, predictor):
     máscara del ultimo frame del batch n y pasarsela como input al batch n+1. 
  
     """
+    last_mask = None # the last frame mask from the batch will be stored to propagate it throught the next batch 
 
     def batch_generator(frame_paths, batch_size):
         """Yield successive batches from frame_paths."""
@@ -115,13 +119,28 @@ def process_by_batches(video:Video, batch_size:int, predictor):
             yield frame_paths[i:i + batch_size]
 
     for batch in batch_generator(video.get_frame_names(), batch_size):
-        
         with tempfile.TemporaryDirectory() as temp_dir: # create a temp directory to store the frames selected in the patch and infere them. Save the last mask. 
             for frame_path in batch: 
                 frame_path = os.path.join(video.selected_frames_path, frame_path)
                 os.symlink(frame_path, os.path.join(temp_dir, os.path.basename(frame_path)))
+    
+            batch_inference_state = predictor.init_state(temp_dir, async_loading_frames=True) # batch tieen que ser una pseudocarpeta con los frames. 
 
-            batch_inference_state = predictor.init_state(temp_dir) # batch tieen que ser una pseudocarpeta con los frames. 
+            frame_idx = fnc.get_frame_idx(batch[0])
+            if last_mask is None: # this should mean that the batch that is being process is the first one and we have points selected from them. 
+                    # since we will select points from the first frame, we process it in a different way. 
+                points = np.array(list(video.coordinates.values()), dtype=np.float32) # this should only have coordinates of the first frame... or 
+                                                                                    # at least coordinates of images from the first batch. 
+                labels = np.ones(points.shape[0], dtype=np.int32)
+                ann_obj_id = 1
+                _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=batch_inference_state,
+                                                                                   frame_idx=frame_idx, obj_id=ann_obj_id, points=points, labels=labels)
+
+                pass 
+            
+            #should reset state after each batch? This is the last thing that should be done. 
+            predictor.reset_state(batch_inference_state)
+            
             
 
 def on_frames_confirmed(video:Video):
@@ -143,7 +162,7 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
-    process_by_batches(video , 10, predictor) 
+    # TODO: process_by_batches(video , 10, predictor) 
 
     # Should diferenciate between large videos and small videos. Large videos 
     # should be load to the predictor in batches and pass throught the next batch 
@@ -158,7 +177,7 @@ def on_frames_confirmed(video:Video):
     labels = np.ones(points.shape[0], dtype=np.int32)
     # these are the indeces of the frames used in the inference
     frame_index = 0
-    ann_obj_id = 1
+    ann_obj_id = 1 # give a unique id to each object we interact with (it can be any integers). A single id for each object to track in the prediction. 
 
     _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
 
@@ -178,8 +197,7 @@ def on_frames_confirmed(video:Video):
     os.makedirs(masks_path, exist_ok=True)  
 
     vis_frame_stride = 30
-    plt.close("all")
-    
+    plt.close("all")    
     for out_frame_idx in tqdm(range(0, len(frame_names))): 
         image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
         
@@ -205,14 +223,10 @@ def on_frames_confirmed(video:Video):
     else: 
         sys.exit(0) 
 
-def select_input_type(): 
-    "returns the type of selection that will be done in the main window."
-    choice = messagebox.askquestion("Select Input", "Do you want to select a video file? Click 'No' to select a folder.")
-    selection_type = True if choice == "yes" else False
-
-    return selection_type
-
 def main():
+    """
+    Main loop of the application. 
+    """
     global main_root    
     main_root = tk.Tk()
 
@@ -222,7 +236,7 @@ def main():
     # Create an empty video object with no properties. It will be later update by the videoViewer/frameViewer depend on the input. 
     video = Video(res_dir)
 
-    selection_type = select_input_type()
+    selection_type = fnc.select_input_type()
     if selection_type: 
         video_viewer = VideoViewer(main_root, video)
         video_viewer.video.on_confirm = on_video_confirmed
