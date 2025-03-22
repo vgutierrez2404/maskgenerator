@@ -118,7 +118,9 @@ def process_by_batches(video:Video, batch_size:int, predictor):
         for i in range(0, len(frame_paths), batch_size):
             yield frame_paths[i:i + batch_size]
 
-    for batch in batch_generator(video.get_frame_names(), batch_size):
+    video_segmentations = {} # dictionary containing the index of the frame and its mask. 
+    last_mask = {} # dictionary containing single key-value pair?? 
+    for batch in tqdm(batch_generator(video.get_frame_names(), batch_size)):
         with tempfile.TemporaryDirectory() as temp_dir: # create a temp directory to store the frames selected in the patch and infere them. Save the last mask. 
             for frame_path in batch: 
                 frame_path = os.path.join(video.selected_frames_path, frame_path)
@@ -136,8 +138,28 @@ def process_by_batches(video:Video, batch_size:int, predictor):
                 _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=batch_inference_state,
                                                                                    frame_idx=frame_idx, obj_id=ann_obj_id, points=points, labels=labels)
 
-                pass 
-            
+                # add to the dictionary that will have the segmentation masks of the frames and that will be used the 
+                # last_key, last_value = next(reversed(my_dict.items()))
+                for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(batch_inference_state):
+                    video_segmentations[out_frame_idx] = {
+                        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                        for i, out_obj_id in enumerate(out_obj_ids)
+                        }
+                    
+                if video_segmentations: 
+                    last_mask = next(reversed(video_segmentations[out_frame_idx].values()))
+                else: 
+                    raise ValueError("Error: No mask found for the last frame in the batch.")
+                # once we store the last mask of the batch we can continue with the next batch. 
+                # should we reset the state of the predictor? 
+                predictor.reset_state(batch_inference_state)
+                continue 
+
+            # ahora ya no se propagan ppuntos, solo se tiene la primera máscara de la imagen del batch n+1  como input, que es la la mascara del batch n
+            ann_obj_id = 1 
+            _, out_obj_ids, out_mask_logits = predictor.add_new_mask() # completar. Como hace para utilizar la máscara como input y propagarlo en el video?? 
+
+            # 
             #should reset state after each batch? This is the last thing that should be done. 
             predictor.reset_state(batch_inference_state)
             
