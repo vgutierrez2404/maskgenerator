@@ -143,7 +143,7 @@ def get_frame_idx(frame:str) -> int:
     """
     Returns the frame index of a frame path string as an integer. 
     """
-    match = re.search(r'frame_(\d+)', frame)
+    match = re.search(r'(?:frame_)?(\d+)', frame)
     if match:
         return int(match.group(1))
     else:

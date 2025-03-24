@@ -17,16 +17,9 @@ sys.path.insert(0, os.path.abspath("./sam2"))
 from src.video_viewer import VideoViewer
 from src.frame_viewer import FrameViewer
 from sam2.build_sam import build_sam2_video_predictor
-import utils.functions as fnc
+import src.utils.functions as fnc
 import src.utils.preprocessing as preprocessing
 from src.video import Video 
-
-######################
-#
-# Sources: https://colab.research.google.com/github/facebookresearch/sam2/blob/main/notebooks/video_predictor_example.ipynb#scrollTo=1a572ea9-5b7e-479c-b30c-93c38b121131
-#          https://github.com/facebookresearch/sam2#installation
-#
-######################
 
 # Global flag for root window
 main_root = None
@@ -111,25 +104,25 @@ def process_by_batches(video:Video, batch_size:int, predictor):
     máscara del ultimo frame del batch n y pasarsela como input al batch n+1. 
  
     """
-    last_mask = None # the last frame mask from the batch will be stored to propagate it throught the next batch 
-
     def batch_generator(frame_paths, batch_size):
         """Yield successive batches from frame_paths."""
         for i in range(0, len(frame_paths), batch_size):
             yield frame_paths[i:i + batch_size]
 
     video_segmentations = {} # dictionary containing the index of the frame and its mask. 
-    last_mask = {} # dictionary containing single key-value pair?? 
-    for batch in tqdm(batch_generator(video.get_frame_names(), batch_size)):
+    last_mask = None # dictionary containing single key-value pair?? 
+    for index, batch in enumerate(tqdm(batch_generator(video.get_frame_names(), batch_size))):
         with tempfile.TemporaryDirectory() as temp_dir: # create a temp directory to store the frames selected in the patch and infere them. Save the last mask. 
             for frame_path in batch: 
                 frame_path = os.path.join(video.selected_frames_path, frame_path)
                 os.symlink(frame_path, os.path.join(temp_dir, os.path.basename(frame_path)))
     
-            batch_inference_state = predictor.init_state(temp_dir, async_loading_frames=True) # batch tieen que ser una pseudocarpeta con los frames. 
+            # batch_inference_state = predictor.init_state(temp_dir, async_loading_frames=True) # batch tieen que ser una pseudocarpeta con los frames. 
+            batch_inference_state = predictor.init_state(temp_dir,) # batch tieen que ser una pseudocarpeta con los frames. 
 
             frame_idx = fnc.get_frame_idx(batch[0])
-            if last_mask is None: # this should mean that the batch that is being process is the first one and we have points selected from them. 
+            # For the first batch we use coordinates for the prediction of the mask 
+            if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0):   # this should mean that the batch that is being process is the first one and we have points selected from them.
                     # since we will select points from the first frame, we process it in a different way. 
                 points = np.array(list(video.coordinates.values()), dtype=np.float32) # this should only have coordinates of the first frame... or 
                                                                                     # at least coordinates of images from the first batch. 
@@ -141,29 +134,41 @@ def process_by_batches(video:Video, batch_size:int, predictor):
                 # add to the dictionary that will have the segmentation masks of the frames and that will be used the 
                 # last_key, last_value = next(reversed(my_dict.items()))
                 for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(batch_inference_state):
-                    video_segmentations[out_frame_idx] = {
+                    video_segmentations[(index * batch_size) + out_frame_idx] = {
                         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                         for i, out_obj_id in enumerate(out_obj_ids)
                         }
                     
                 if video_segmentations: 
-                    last_mask = next(reversed(video_segmentations[out_frame_idx].values()))
+                    last_mask = next(reversed(video_segmentations[(index * batch_size) + out_frame_idx].values())).squeeze()
                 else: 
                     raise ValueError("Error: No mask found for the last frame in the batch.")
                 # once we store the last mask of the batch we can continue with the next batch. 
                 # should we reset the state of the predictor? 
-                predictor.reset_state(batch_inference_state)
-                continue 
+                # predictor.reset_state(batch_inference_state)
+                # continue 
+            
+            else: # for next batche, we use the mask from the last frame of the previous batch.  
 
-            # ahora ya no se propagan ppuntos, solo se tiene la primera máscara de la imagen del batch n+1  como input, que es la la mascara del batch n
-            ann_obj_id = 1 
-            _, out_obj_ids, out_mask_logits = predictor.add_new_mask() # completar. Como hace para utilizar la máscara como input y propagarlo en el video?? 
-
-            # 
+                # ahora ya no se propagan ppuntos, solo se tiene la primera máscara de la imagen del batch n+1  como input, que es la la mascara del batch n
+                ann_obj_id = 1 
+                frame_idx = 0
+                _, out_obj_ids, out_mask_logits = predictor.add_new_mask(batch_inference_state, frame_idx, ann_obj_id, last_mask) # es este frame index?  
+                
+                # ahora se supone que ya está cargada la mascara en el predictor, debería tener que poder propagarse en el video. 
+                for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(batch_inference_state):
+                    video_segmentations[(index * batch_size) + out_frame_idx] = {
+                        out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                        for i, out_obj_id in enumerate(out_obj_ids)
+                        }
+                    
+                last_mask = next(reversed(video_segmentations[(index * batch_size) + out_frame_idx].values())).squeeze() # dave the last mask to propagate it to the next batch. 
+                print(f"{len(video_segmentations)} segmentations found")
             #should reset state after each batch? This is the last thing that should be done. 
             predictor.reset_state(batch_inference_state)
-            
-            
+        print(f"Processing next batch {index + 1 }\n")  
+
+    return video_segmentations      
 
 def on_frames_confirmed(video:Video):
     """"
@@ -184,7 +189,7 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
-    # TODO: process_by_batches(video , 10, predictor) 
+    video_segments = process_by_batches(video , 10, predictor) 
 
     # Should diferenciate between large videos and small videos. Large videos 
     # should be load to the predictor in batches and pass throught the next batch 
@@ -192,27 +197,29 @@ def on_frames_confirmed(video:Video):
 
     # que para hacer inferencia haya que pasarle el path de una carpeta de frames me parece una mierda, mejor sería pasarle los paths de los frames, pero bueno. 
     # esto hace que tenga que tener dos carpetas, una con los frames seleccionados y otra con todos los frames... 
-    inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
+    """
+    # inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
 
-    points = np.array(list(video.coordinates.values()), dtype=np.float32)
+    # points = np.array(list(video.coordinates.values()), dtype=np.float32)
     
-    labels = np.ones(points.shape[0], dtype=np.int32)
-    # these are the indeces of the frames used in the inference
-    frame_index = 0
-    ann_obj_id = 1 # give a unique id to each object we interact with (it can be any integers). A single id for each object to track in the prediction. 
+    # labels = np.ones(points.shape[0], dtype=np.int32)
+    # # these are the indeces of the frames used in the inference
+    # frame_index = 0
+    # ann_obj_id = 1 # give a unique id to each object we interact with (it can be any integers). A single id for each object to track in the prediction. 
 
-    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
-
+    # _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
+    """
     frame_names = video.get_frame_names()
 
     # now i want to propagate the first mask through the entire video
     # run propagation throughout the video and collect the results in a dict
-    video_segments = {}  # video_segments contains the per-frame segmentation results
-    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
-        video_segments[out_frame_idx] = {
-            out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-            for i, out_obj_id in enumerate(out_obj_ids)
-        }
+    
+    # video_segments = {}  # video_segments contains the per-frame segmentation results
+    # for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
+    #     video_segments[out_frame_idx] = {
+    #         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+    #         for i, out_obj_id in enumerate(out_obj_ids)
+    #     }
 
     # render the segmentation results every few frames
     masks_path = os.path.join(video.frames_path, "masks")   
@@ -239,7 +246,7 @@ def on_frames_confirmed(video:Video):
     main_root.destroy()
     if load_diff_video:
         # When eveything finishes, reset the state of the predictor in order to not deallocate the memory. 
-        predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
+        ## predictor.reset_state(inference_state) # Seemos like this is only needed if other video is added to the tool. 
         # if its the same video, frames are stored in cache. 
         main()
     else: 
