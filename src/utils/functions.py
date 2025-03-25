@@ -92,6 +92,20 @@ def show_mask_on_frame(ann_frame_idx, video_dir, frame_names, points, labels, ou
     show_points(points, labels, plt.gca())
     show_mask((out_mask_logits[0] > 0.0).cpu().numpy(), plt.gca(), obj_id=out_obj_ids[0])
 
+    
+def refine_masks(image: Image): 
+    """
+    The masks will be refined using a kernel, like cnn do
+    """
+    kernel = np.ones((3,3), np.uint8)
+
+    # dilated_mask = cv2.dilate(image, kernel, iterations=2)
+    opened_mask = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+    # Apply morphological closing
+    refined_mask = cv2.morphologyEx(opened_mask, cv2.MORPH_CLOSE, kernel)    
+
+    return refined_mask
+
 def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_frame_idx:int) -> None:
     """
     For each frame, takes the mask obtained by the model and applies it to the image 
@@ -102,8 +116,11 @@ def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_fra
     mask_image = (mask.reshape(h, w, 1)*255).astype(np.uint8)
     mask_image = cv2.bitwise_not(mask_image)
     res_image = cv2.bitwise_and(np.asarray(image),np.asarray(image), mask=mask_image)
-
+    
+    # refined_mask = refine_masks(res_image) #TODO: finish the postprocessing of the images to regine the mask. 
+    
     masked_image = Image.fromarray(res_image)
+    
     masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:08d}.jpg")) # this is resetting the index of the frames!! CARE
 
 def check_for_preprocesed_frames(): 

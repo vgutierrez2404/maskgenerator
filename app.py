@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from tkinter import messagebox
 from tqdm import tqdm 
 import tempfile 
+import cv2 
 
 # Append the absolute path of the sam2 directory to sys.path
 sys.path.insert(0, os.path.abspath("./sam2"))
@@ -97,7 +98,7 @@ def on_video_confirmed(video:Video):
     main_root.mainloop()   
 
 
-def process_by_batches(video:Video, batch_size:int, predictor): 
+def inference_by_batches(video:Video, batch_size:int, predictor): 
     """
     lo que debería hacer es coger todos los frames del video, separarlos en batches 
     y llamar a init_state y propagate_in_video con cada batch. Luego, coger la 
@@ -170,6 +171,58 @@ def process_by_batches(video:Video, batch_size:int, predictor):
 
     return video_segmentations      
 
+def normal_inference(video:Video, predictor): 
+    """
+    As done in the original sam demo notebook
+
+    Return: 
+        - video_segments: dictionary containing the index of the frame and its mask. 
+    """
+    inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)  # async_loading_frames: introduce en memoria los frames de forma asyncrona mientras hace inferencia con vide_prediction. 
+
+    points = np.array(list(video.coordinates.values()), dtype=np.float32)
+    
+    labels = np.ones(points.shape[0], dtype=np.int32)
+    frame_index = 0
+    ann_obj_id = 1 # give a unique id to each object we interact with (it can be any integers). A single id for each object to track in the prediction. 
+
+    _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
+    
+    video_segments = {}  # video_segments contains the per-frame segmentation results
+    for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
+        video_segments[out_frame_idx] = {
+            out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+            for i, out_obj_id in enumerate(out_obj_ids)
+        }
+
+    return video_segments 
+
+def render_segmentation(video:Video, video_segmentations:dict, frame_names:list): 
+    """
+    Post process the images and mask after the inference of the model. Add to the images
+    the masks and save them. Optionally, display some of the images and masks.  
+    """
+    # search for mask path in the directory of frames. 
+    masks_path = os.path.join(video.frames_path, "masks")   
+    os.makedirs(masks_path, exist_ok=True)  
+
+    vis_frame_stride = 30 # each vis_frame_strides plot mask and image. 
+    plt.close("all") # close all previous figures.     
+
+    for out_frame_idx in tqdm(range(0, len(frame_names))): 
+        image = Image.open(os.path.join(video.video_path, frame_names[out_frame_idx]))
+        
+        if out_frame_idx % vis_frame_stride == 0: # visaulization as in the sam demo 
+            plt.figure(figsize=(6, 4))
+            plt.title(f"frame {out_frame_idx}")
+            plt.imshow(Image.open(os.path.join(video.video_path, frame_names[out_frame_idx])))
+
+        for out_obj_id, out_mask in video_segmentations[out_frame_idx].items(): # add mask to each of the frames and save them. 
+            fnc.add_mask_and_save_image(masks_path, image, out_mask, out_frame_idx)
+            
+            if out_frame_idx % vis_frame_stride == 0: 
+                fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
+
 def on_frames_confirmed(video:Video):
     """"
     When the frames are confirmed, we throw the prediction on the coordinates 
@@ -189,38 +242,12 @@ def on_frames_confirmed(video:Video):
     config_path = os.path.join(os.getcwd(), "sam2", "sam2", "configs",  "sam2.1")
     predictor = build_sam2_video_predictor(model_config, checkpoints, device=device, config_path=config_path) # Step 1: load the video predictor 
 
-    video_segments = process_by_batches(video , 10, predictor) 
+    batch_size = 10
+    video_segments = inference_by_batches(video , batch_size, predictor) 
 
-    # Should diferenciate between large videos and small videos. Large videos 
-    # should be load to the predictor in batches and pass throught the next batch 
-    # the mask that has been generated and the attention??  
-
-    # que para hacer inferencia haya que pasarle el path de una carpeta de frames me parece una mierda, mejor sería pasarle los paths de los frames, pero bueno. 
-    # esto hace que tenga que tener dos carpetas, una con los frames seleccionados y otra con todos los frames... 
-    """
-    # inference_state = predictor.init_state(video_path=video.selected_frames_path, async_loading_frames=True)   # quizás se puede activar el asynchronus_loading_frames para mejorar la eficiencia y que no se quede sin memoria 
-
-    # points = np.array(list(video.coordinates.values()), dtype=np.float32)
-    
-    # labels = np.ones(points.shape[0], dtype=np.int32)
-    # # these are the indeces of the frames used in the inference
-    # frame_index = 0
-    # ann_obj_id = 1 # give a unique id to each object we interact with (it can be any integers). A single id for each object to track in the prediction. 
-
-    # _, out_obj_ids, out_mask_logits = predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
-    """
     frame_names = video.get_frame_names()
 
-    # now i want to propagate the first mask through the entire video
-    # run propagation throughout the video and collect the results in a dict
-    
-    # video_segments = {}  # video_segments contains the per-frame segmentation results
-    # for out_frame_idx, out_obj_ids, out_mask_logits in predictor.propagate_in_video(inference_state):
-    #     video_segments[out_frame_idx] = {
-    #         out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-    #         for i, out_obj_id in enumerate(out_obj_ids)
-    #     }
-
+    render_segmentation(video, video_segments, frame_names)
     # render the segmentation results every few frames
     masks_path = os.path.join(video.frames_path, "masks")   
     os.makedirs(masks_path, exist_ok=True)  
@@ -228,13 +255,13 @@ def on_frames_confirmed(video:Video):
     vis_frame_stride = 30
     plt.close("all")    
     for out_frame_idx in tqdm(range(0, len(frame_names))): 
-        image = Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx]))
-        
+        image = Image.open(os.path.join(video.video_path, frame_names[out_frame_idx]))
+
         # visualization as in the sam demo  
         if out_frame_idx % vis_frame_stride == 0: # this does not work in the ffirst video. 
             plt.figure(figsize=(6, 4))
             plt.title(f"frame {out_frame_idx}")
-            plt.imshow(Image.open(os.path.join(os.path.dirname(video.video_path.rstrip("/")), frame_names[out_frame_idx])))
+            plt.imshow(Image.open(os.path.join(video.video_path, frame_names[out_frame_idx])))
 
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
             fnc.add_mask_and_save_image(masks_path, image, out_mask, out_frame_idx)
