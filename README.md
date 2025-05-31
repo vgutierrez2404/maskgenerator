@@ -4,7 +4,8 @@ From a virtual environment
 ```
     pip install -e . 
 ```
-
+## TODO 
+Add a bounding box feature to select the foreground of the scene in case that more than 1 object exists and the user doesn't want to use points. 
 
 ### Usage 
 
