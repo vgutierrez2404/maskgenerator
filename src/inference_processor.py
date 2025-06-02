@@ -23,10 +23,10 @@ class InferenceProcessor:
         """
         self.video = video
         self.config = ConfigLoader()
-        self.device = self.check_device_used()
-        self.predictor = self.load_predictor()
+        self.device = self._check_device_used()
+        self.predictor = self._load_predictor()
 
-    def check_device_used(self): 
+    def _check_device_used(self): 
         """
         Checks if the device running that runs the model has CUDA available. If not, it uses the cpu or in case of a 
         apple silicon chip, mps. 
@@ -62,7 +62,7 @@ class InferenceProcessor:
 
         return device
 
-    def load_predictor(self):
+    def _load_predictor(self):
         """
         Loads the video predictor model based on the configuration.
         """
@@ -73,9 +73,10 @@ class InferenceProcessor:
             config_path=self.config.config_path
         )
     
-    def normal_inference(self): 
+    def _normal_inference(self): 
         """
-        As done in the original sam demo notebook
+        As done in the original sam demo notebook. It can run out of memory if the 
+        video has too many frames. 
 
         Return: 
             - video_segments: dictionary containing the index of the frame and its mask. 
@@ -90,51 +91,49 @@ class InferenceProcessor:
 
         _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
         
-        video_segments = {}  # video_segments contains the per-frame segmentation results
+        video_segmentations = {}  # video_segments contains the per-frame segmentation results
         for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(inference_state):
-            video_segments[out_frame_idx] = {
+            video_segmentations[out_frame_idx] = {
                 out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                 for i, out_obj_id in enumerate(out_obj_ids)
             }
 
-        return video_segments 
+        return video_segmentations 
 
-    def inference_by_batches(self): 
+    def _inference_by_batches(self): 
         """
-        lo que debería hacer es coger todos los frames del video, separarlos en batches 
-        y llamar a init_state y propagate_in_video con cada batch. Luego, coger la 
-        máscara del ultimo frame del batch n y pasarsela como input al batch n+1. 
-    
+        Infereces by batches the video, allowing to process larger videos in a single gpu. 
+        Divides frames path into batches. The batch is processed and the mask of the last frame is saved. 
+        In the next batch, the saved mask is used as input (two adjoining frames should not be very different).
+
+        Return: 
+            - video_segments: dictionary containing the index of the frame and its mask. 
         """
+        
         def batch_generator(frame_paths, batch_size):
             """Yield successive batches from frame_paths."""
             for i in range(0, len(frame_paths), batch_size):
                 yield frame_paths[i:i + batch_size]
 
-        video_segmentations = {} # dictionary containing the index of the frame and its mask. 
-        last_mask = None # dictionary containing single key-value pair?? 
+        video_segmentations = {} # frame_idx-mask. 
+        last_mask = None 
         for index, batch in enumerate(tqdm(batch_generator(self.video.get_frame_names(), self.config.batch_size))):
-            with tempfile.TemporaryDirectory() as temp_dir: # create a temp directory to store the frames selected in the patch and infere them. Save the last mask. 
+            with tempfile.TemporaryDirectory() as temp_dir: # temp dir to store frames from the batch (sam2 predictor needs a directory, not abs paths)
                 for frame_path in batch: 
                     frame_path = os.path.join(self.video.selected_frames_path, frame_path)
                     os.symlink(frame_path, os.path.join(temp_dir, os.path.basename(frame_path)))
         
-                # batch_inference_state = predictor.init_state(temp_dir, async_loading_frames=True) # batch tieen que ser una pseudocarpeta con los frames. 
-                batch_inference_state = self.predictor.init_state(temp_dir,) # batch tieen que ser una pseudocarpeta con los frames. 
+                batch_inference_state = self.predictor.init_state(temp_dir) # no need for async loading of frames if processed by batches. 
 
                 frame_idx = get_frame_idx(batch[0])
-                # For the first batch we use coordinates for the prediction of the mask 
-                if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0):   # this should mean that the batch that is being process is the first one and we have points selected from them.
-                        # since we will select points from the first frame, we process it in a different way. 
-                    points = np.array(list(self.video.coordinates.values()), dtype=np.float32) # this should only have coordinates of the first frame... or 
-                                                                                        # at least coordinates of images from the first batch. 
+                if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0): # for first batch we use coordinates as prompt to predict the mask. 
+
+                    points = np.array(list(self.video.coordinates.values()), dtype=np.float32) 
                     labels = np.ones(points.shape[0], dtype=np.int32)
                     ann_obj_id = 1
                     _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
                                                                                     frame_idx=frame_idx, obj_id=ann_obj_id, points=points, labels=labels)
 
-                    # add to the dictionary that will have the segmentation masks of the frames and that will be used the 
-                    # last_key, last_value = next(reversed(my_dict.items()))
                     for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(batch_inference_state):
                         video_segmentations[(index * self.config.batch_size) + out_frame_idx] = {
                             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
@@ -142,32 +141,27 @@ class InferenceProcessor:
                             }
                         
                     if video_segmentations: 
-                        last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze()
+                        last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze() # save the last mask. 
+
                     else: 
                         raise ValueError("Error: No mask found for the last frame in the batch.")
-                    # once we store the last mask of the batch we can continue with the next batch. 
-                    # should we reset the state of the predictor? 
-                    # predictor.reset_state(batch_inference_state)
-                    # continue 
-                
-                else: # for next batche, we use the mask from the last frame of the previous batch.  
-
-                    # ahora ya no se propagan ppuntos, solo se tiene la primera máscara de la imagen del batch n+1  como input, que es la la mascara del batch n
-                    ann_obj_id = 1 
-                    frame_idx = 0
+   
+                else: # rest of batches we propagate the mask of the last batch. 
+                    ann_obj_id = 1 # the index of the object we are masking.  
+                    frame_idx = 0 # in the first frame of the batch. 
                     _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(batch_inference_state, frame_idx, ann_obj_id, last_mask) # es este frame index?  
                     
-                    # ahora se supone que ya está cargada la mascara en el predictor, debería tener que poder propagarse en el video. 
                     for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(batch_inference_state):
                         video_segmentations[(index * self.config.batch_size) + out_frame_idx] = {
                             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                             for i, out_obj_id in enumerate(out_obj_ids)
                             }
                         
-                    last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze() # dave the last mask to propagate it to the next batch. 
-                    print(f"{len(video_segmentations)} segmentations found")
-                #should reset state after each batch? This is the last thing that should be done. 
+                    last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze()
+                
+                # always reset the state of the predictor when the batch ends. 
                 self.predictor.reset_state(batch_inference_state)
+
             print(f"Processing next batch {index + 1 }\n")  
 
         return video_segmentations      
@@ -176,10 +170,12 @@ class InferenceProcessor:
         """
         Runs inference based on the selected inference type in the configuration.
         """
-        if self.config.inference_type == "normal":
-            return self.normal_inference()
+        if self.config.inference_type == "batches":
+            return self._inference_by_batches()
         
-        elif self.config.inference_type == "batches":
-            return self.inference_by_batches()
         else:
-            raise ValueError(f"Unknown inference type: {self.config.inference_type}")
+            
+            video_segmentations = self._normal_inference()
+            if not video_segmentations: 
+                raise ValueError("Error while trying to run inference. No video_segmentations found.")
+            

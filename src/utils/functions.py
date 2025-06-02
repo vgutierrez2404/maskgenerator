@@ -106,6 +106,14 @@ def refine_masks(image: Image):
 
     return refined_mask
 
+def save_mask_as_image(masks_path: str, mask: np.array, out_frame_idx:int): 
+
+    h, w = mask.shape[-2:]
+    mask = (mask.reshape(h, w, 1)*255).astype(np.uint8)
+
+    mask_as_image = Image.fromarray(mask)
+    mask_as_image.save(os.path.join(masks_path, f"mask_{out_frame_idx:08d}.jpg"))
+
 def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_frame_idx:int) -> None:
     """
     For each frame, takes the mask obtained by the model and applies it to the image 

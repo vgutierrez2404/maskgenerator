@@ -8,7 +8,7 @@ from tkinter import messagebox
 from tqdm import tqdm 
 
 # Append the absolute path of the sam2 directory to sys.path
-sys.path.insert(0, os.path.abspath("./sam2"))
+sys.path.insert(0, os.path.abspath("./sam2")) # esto sigue siendo necesario?? 
 
 # Local libraries 
 from src.video_viewer import VideoViewer
@@ -117,7 +117,7 @@ def on_frames_confirmed(video:Video):
 
         for out_obj_id, out_mask in video_segments[out_frame_idx].items():
             fnc.add_mask_and_save_image(masks_path, image, out_mask, out_frame_idx)
-            
+            # TODO: fnc.save_mask_as_image(masks_path, out_mask, out_frame_idx)
             if out_frame_idx % vis_frame_stride == 0: # visualization as in the sam demo 
                 fnc.show_mask(out_mask, plt.gca(), obj_id=out_obj_id, black_mask=True)
 
