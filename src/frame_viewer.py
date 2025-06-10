@@ -16,6 +16,7 @@ class FrameViewer:
         self.frames_dir = self.video.selected_frames_path if self.video.selected_frames_path is not None else self.video.frames_path
         self.frame_index = 0  # Start with the first frame
         self.coordinates = {}  # Dictionary of points selected in each of the frames.
+        self.box = None # Placeholder for the bounding box if needed
         
         self.frame_panel = tk.Label(self.root)
         self.frame_panel.pack()

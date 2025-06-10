@@ -5,3 +5,6 @@
 *yaml
 *venv
 *png
+
+/.vscode
+/data 
