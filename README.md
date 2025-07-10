@@ -31,7 +31,9 @@ From a virtual environment
 - Add a bounding box feature to select the foreground of the scene in case that more than 1 object exists and the user doesn't want to use points. 
 - Add feature to select the points that we don't want in the segmentation mask 
 - Update readme with the correct info to install and run the tool.
--  
+- Make able to select a remote location for the video via ssh. 
+- Save the logits of each mask and the mask with the same name. 
+
 ### Usage 
 
 After installation, run: 
@@ -40,8 +42,3 @@ After installation, run:
 ``` 
 and select the desired video. 
 
-
-### updates 
-
-Make able to select a remote location for the video via ssh. 
-Save the logits of each mask and the mask with the same name. 
