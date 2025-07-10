@@ -39,3 +39,9 @@ After installation, run:
     python3 app.py # o el nombre que acabe teniendo 
 ``` 
 and select the desired video. 
+
+
+### updates 
+
+Make able to select a remote location for the video via ssh. 
+Save the logits of each mask and the mask with the same name. 

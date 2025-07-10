@@ -46,7 +46,12 @@ class FrameViewer:
         
     def load_frame(self, index):
 
-        frame_path = os.path.join(self.frames_dir, f"{index:05d}.jpg")
+        # hacer esto cada vez que cargo un frame es un acto de terrorismo.
+        frame_files = [f for f in os.listdir(self.video.frames_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        if frame_files:
+            frame = sorted(frame_files)[index]
+
+        frame_path = os.path.join(self.frames_dir, frame)
         
         if not os.path.exists(frame_path):
             messagebox.showerror("Error", f"No frame found at {frame_path}")
@@ -89,7 +94,7 @@ class FrameViewer:
         :param direction: 1 for next frame, -1 for previous frame.
         """
         frame_names = self.video.get_frame_names()
-        indexes = sorted(int(filename.split(".")[0]) for filename in frame_names)
+        indexes = sorted(int(filename.split(".")[0].replace('frame', '')) for filename in frame_names)
 
         if self.frame_index in indexes:
             current_idx = indexes.index(self.frame_index)

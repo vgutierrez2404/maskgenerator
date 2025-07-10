@@ -136,5 +136,10 @@ class Video:
         if self.input_type == "video": 
             self.frame_size = (int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         else: 
-            self.frame_size = cv2.imread(os.path.join(self.frames_path, "00000.jpg")).shape[1::-1]
+            frame_files = [f for f in os.listdir(self.frames_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            if frame_files:
+                first_frame = sorted(frame_files)[0]
+                self.frame_size = cv2.imread(os.path.join(self.frames_path, first_frame)).shape[1::-1]
+            else:
+                self.frame_size = cv2.imread(os.path.join(self.frames_path, "00000.jpg")).shape[1::-1]
     
