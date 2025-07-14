@@ -126,26 +126,39 @@ class InferenceProcessor:
                 batch_inference_state = self.predictor.init_state(temp_dir) # no need for async loading of frames if processed by batches. 
 
                 frame_idx = get_frame_idx(batch[0])
-                if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0): # for first batch we use coordinates as prompt to predict the mask. 
+                if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0): # for first batch we use coord or bbox as prompt to predict the mask. 
 
-                    points = np.array(list(self.video.coordinates.values()), dtype=np.float32) 
-                    labels = np.ones(points.shape[0], dtype=np.int32)
-                    ann_obj_id = 1
-                    _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
-                                                                                    frame_idx=frame_idx, obj_id=ann_obj_id, points=points, labels=labels)
+                    if self.video.has_bounding_box(frame_idx): 
+                         
+                        # label 1 indicates a positive click (to add a region) 
+                        # while label 0 indicates a negative click (to remove a region).
+                    
+                        ann_obj_id = 1 # unique id for the object we are annotating.
+                        bbox = self.video.get_bounding_box(frame_idx)
+                        _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
+                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, box=bbox)
+
+                    else: 
+                        points = np.array(list(self.video.coordinates.values()), dtype=np.float32)
+                        # label 1 indicates a positive click (to add a region) 
+                        # while label 0 indicates a negative click (to remove a region).
+                        labels = np.ones(points.shape[0], dtype=np.int32) 
+                        ann_obj_id = 1 
+                        _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
+                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, points=points, labels=labels)
 
                     for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(batch_inference_state):
-                        video_segmentations[(index * self.config.batch_size) + out_frame_idx] = {
-                            out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
-                            for i, out_obj_id in enumerate(out_obj_ids)
-                            }
-                        
+                            video_segmentations[(index * self.config.batch_size) + out_frame_idx] = {
+                                out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
+                                for i, out_obj_id in enumerate(out_obj_ids)
+                                }
+                            
                     if video_segmentations: 
                         last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze() # save the last mask. 
 
                     else: 
                         raise ValueError("Error: No mask found for the last frame in the batch.")
-   
+                    
                 else: # rest of batches we propagate the mask of the last batch. 
                     ann_obj_id = 1 # the index of the object we are masking.  
                     frame_idx = 0 # in the first frame of the batch. 
@@ -159,7 +172,7 @@ class InferenceProcessor:
                         
                     last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze()
                 
-                # always reset the state of the predictor when the batch ends. 
+                # always reset the state of the predictor when the batch ends. / 
                 self.predictor.reset_state(batch_inference_state)
 
             print(f"Processing next batch {index + 1 }\n")  

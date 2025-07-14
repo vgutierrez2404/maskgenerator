@@ -24,8 +24,12 @@ class Video:
         self.input_type = None   
 
         # For the predictions, the coordinates will be stored in a 
-        # dictionary that contains [frame, coordinate]
+        # dictionary that contains [frame, coordinate]. 
+        # We store points and bounding boxes by frame index. 
+    
         self.coordinates = {} 
+        self.bounding_boxes = {}  
+
 
     def set_output_dir(self): 
         self.output_dir = os.path.join(self.results_dir, self.video_name)
@@ -103,6 +107,18 @@ class Video:
 
         return self.coordinates 
 
+    def get_bounding_box(self, frame_idx):
+        """Get bounding box for a specific frame"""
+        return self.bounding_boxes.get(frame_idx, None)
+
+    def set_bounding_box(self, frame_idx, bbox_coords):
+        """Set bounding box for a specific frame"""
+        self.bounding_boxes[frame_idx] = bbox_coords
+
+    def has_bounding_box(self, frame_idx):
+        """Check if frame has a bounding box"""
+        return frame_idx in self.bounding_boxes
+    
     def get_frame_names(self): 
         """
         Finds all the frames in the frames path of the video. 
@@ -142,4 +158,4 @@ class Video:
                 self.frame_size = cv2.imread(os.path.join(self.frames_path, first_frame)).shape[1::-1]
             else:
                 self.frame_size = cv2.imread(os.path.join(self.frames_path, "00000.jpg")).shape[1::-1]
-    
+        

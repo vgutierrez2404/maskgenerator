@@ -16,10 +16,15 @@ class FrameViewer:
         self.frames_dir = self.video.selected_frames_path if self.video.selected_frames_path is not None else self.video.frames_path
         self.frame_index = 0  # Start with the first frame
         self.coordinates = {}  # Dictionary of points selected in each of the frames.
-        self.box = None # Placeholder for the bounding box if needed
+        self.box = {} # Placeholder for the bounding box if needed
         
-        self.frame_panel = tk.Label(self.root)
-        self.frame_panel.pack()
+        # self.frame_panel = tk.Label(self.root)
+        # self.frame_panel.pack()
+
+        # created a canvas instead of label to add bbox selection 
+        self.canvas = tk.Canvas(self.root, cursor="cross")
+        self.canvas.pack()
+
         self.current_frame = None
         self.on_confirm = on_confirm
         
@@ -27,6 +32,13 @@ class FrameViewer:
         btn_frame = tk.Frame(self.root)
         btn_frame.pack()
         
+        # methods for bbox 
+        self.start_x = None
+        self.start_y = None
+        self.rect = None
+        self.is_dragging = False
+        self.drag_threshold = 5  # Threhold to detect if is a bbox or a point selection 
+
         # self.prev_button = tk.Button(btn_frame, text="Previous Frame", command=self.previous_frame)
         self.prev_button = tk.Button(btn_frame, text="Previous Frame", command=lambda: self.change_frame(-1))
         self.prev_button.grid(row=0, column=0)
@@ -42,8 +54,12 @@ class FrameViewer:
         self.load_frame(self.frame_index)
         
         # Bind mouse click event to capture coordinates
-        self.frame_panel.bind("<Button-1>", self.on_click)
-        
+        self.canvas.bind("<Button-1>", self.on_click)
+
+        self.canvas.bind("<ButtonPress-1>", self.on_button_press)
+        self.canvas.bind("<B1-Motion>", self.on_move_press)
+        self.canvas.bind("<ButtonRelease-1>", self.on_button_release)
+                
     def load_frame(self, index):
 
         # hacer esto cada vez que cargo un frame es un acto de terrorismo.
@@ -62,10 +78,17 @@ class FrameViewer:
             raise ValueError(f"Failed to load frame: {frame_path}")
         
         self.current_frame = self.video.process_frame(frame)
-
-        # Update the image panel
-        self.frame_panel.imgtk = self.current_frame
-        self.frame_panel.config(image=self.current_frame)
+    
+        # Get the dimensions of the processed frame
+        frame_width = self.current_frame.width()
+        frame_height = self.current_frame.height()
+        
+        # Update canvas size to match the frame dimensions
+        self.canvas.config(width=frame_width, height=frame_height)
+        
+        # Clear canvas and display the new frame
+        self.canvas.delete("all")  
+        self.canvas.create_image(0, 0, anchor="nw", image=self.current_frame)
         self.root.title(f"Frame Viewer - Frame {index}")
         
     def on_click(self, event):
@@ -126,3 +149,45 @@ class FrameViewer:
     def get_coordinates(self):
         # Return the selected coordinates for each frame
         return self.coordinates
+    
+    def on_button_press(self, event):
+        self.start_x = event.x
+        self.start_y = event.y
+        self.is_dragging = False
+        self.rect = self.canvas.create_rectangle(self.start_x, self.start_y, self.start_x, self.start_y, outline='red')
+
+    def on_move_press(self, event):
+        dx = abs(event.x - self.start_x)
+        dy = abs(event.y - self.start_y)
+        if dx > self.drag_threshold or dy > self.drag_threshold:
+            self.is_dragging = True
+        self.canvas.coords(self.rect, self.start_x, self.start_y, event.x, event.y)
+
+    def on_button_release(self, event):
+
+        frame_width, frame_height = self.current_frame.width(), self.current_frame.height()
+        img_height, img_width = self.video.frame_size  # Assuming you store original size
+        
+        if self.is_dragging:
+            # User drew a box
+            x0, y0, x1, y1 = self.canvas.coords(self.rect)
+            scale_x0 = int((x0 / frame_width) * img_width)
+            scale_y0 = int((y0 / frame_height) * img_height)
+            scale_x1 = int((x1 / frame_width) * img_width)
+            scale_y1 = int((y1 / frame_height) * img_height)
+            
+            self.box[self.frame_index] = (scale_x0, scale_y0, scale_x1, scale_y1)
+            self.video.bounding_boxes[self.frame_index] = (scale_x0, scale_y0, scale_x1, scale_y1)
+            print(f"Bounding box for frame {self.frame_index}: ({scale_x0}, {scale_y0}), ({scale_x1}, {scale_y1})")
+        else:
+            # if the draggig threshold is not met, the selection is trated as a point. 
+            x, y = event.x, event.y
+            scaled_x = int((x / frame_width) * img_width)
+            scaled_y = int((y / frame_height) * img_height)
+
+            self.coordinates[self.frame_index] = (scaled_x, scaled_y)
+            self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)
+            print(f"Point for frame {self.frame_index}: ({scaled_x}, {scaled_y})")
+            self.canvas.delete(self.rect)  # Remove the tiny rectangle
+
+ 
