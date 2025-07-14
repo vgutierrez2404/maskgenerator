@@ -129,17 +129,21 @@ class InferenceProcessor:
                 if last_mask is None or (isinstance(last_mask, np.ndarray) and last_mask.size == 0): # for first batch we use coord or bbox as prompt to predict the mask. 
 
                     if self.video.has_bounding_box(frame_idx): 
-                         
+                        flat_points = [pt for pts in self.video.coordinates.values() for pt in pts]
+                        points = np.array(flat_points, dtype=np.float32)
                         # label 1 indicates a positive click (to add a region) 
                         # while label 0 indicates a negative click (to remove a region).
+                        labels = np.zeros(points.shape[0], dtype=np.int32) 
                     
                         ann_obj_id = 1 # unique id for the object we are annotating.
                         bbox = self.video.get_bounding_box(frame_idx)
                         _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
-                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, box=bbox)
+                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, points= points, labels=labels, box=bbox)
 
                     else: 
-                        points = np.array(list(self.video.coordinates.values()), dtype=np.float32)
+                        flat_points = [pt for pts in self.video.coordinates.values() for pt in pts]
+                        points = np.array(flat_points, dtype=np.float32)
+                        # points = np.array(list(self.video.coordinates.values()), dtype=np.float32)
                         # label 1 indicates a positive click (to add a region) 
                         # while label 0 indicates a negative click (to remove a region).
                         labels = np.ones(points.shape[0], dtype=np.int32) 

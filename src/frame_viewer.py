@@ -18,9 +18,6 @@ class FrameViewer:
         self.coordinates = {}  # Dictionary of points selected in each of the frames.
         self.box = {} # Placeholder for the bounding box if needed
         
-        # self.frame_panel = tk.Label(self.root)
-        # self.frame_panel.pack()
-
         # created a canvas instead of label to add bbox selection 
         self.canvas = tk.Canvas(self.root, cursor="cross")
         self.canvas.pack()
@@ -63,10 +60,23 @@ class FrameViewer:
     def load_frame(self, index):
 
         # hacer esto cada vez que cargo un frame es un acto de terrorismo.
+        def extract_number(filename):
+            """
+            Extract number from filename like 'frame10.png' or 'frame_10.png'
+            """
+            import re 
+            match = re.search(r'\d+', filename)
+            if match:
+                return int(match.group())
+            else:
+                return -1  # fallback if no number found
+
         frame_files = [f for f in os.listdir(self.video.frames_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
         if frame_files:
-            frame = sorted(frame_files)[index]
-
+            # frame = sorted(frame_files)[index]
+            sorted_files = sorted(frame_files, key=extract_number)
+            frame = sorted_files[index]
+            
         frame_path = os.path.join(self.frames_dir, frame)
         
         if not os.path.exists(frame_path):
@@ -185,9 +195,17 @@ class FrameViewer:
             scaled_x = int((x / frame_width) * img_width)
             scaled_y = int((y / frame_height) * img_height)
 
-            self.coordinates[self.frame_index] = (scaled_x, scaled_y)
-            self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)
-            print(f"Point for frame {self.frame_index}: ({scaled_x}, {scaled_y})")
-            self.canvas.delete(self.rect)  # Remove the tiny rectangle
+            # self.coordinates[self.frame_index] = (scaled_x, scaled_y)
+            # self.video.coordinates[self.frame_index] = (scaled_x, scaled_y)
+                    # Append instead of overwrite
+            if self.frame_index not in self.coordinates:
+                self.coordinates[self.frame_index] = []
+            if self.frame_index not in self.video.coordinates:
+                self.video.coordinates[self.frame_index] = []
 
- 
+            self.coordinates[self.frame_index].append((scaled_x, scaled_y))
+            self.video.coordinates[self.frame_index].append((scaled_x, scaled_y))
+
+            print(f"Point for frame {self.frame_index}: ({scaled_x}, {scaled_y})")
+
+            self.canvas.delete(self.rect)  # Remove the tiny rectangle
