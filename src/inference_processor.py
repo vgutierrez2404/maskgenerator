@@ -117,6 +117,7 @@ class InferenceProcessor:
 
         video_segmentations = {} # frame_idx-mask. 
         last_mask = None 
+
         for index, batch in enumerate(tqdm(batch_generator(self.video.get_frame_names(), self.config.batch_size))):
             with tempfile.TemporaryDirectory() as temp_dir: # temp dir to store frames from the batch (sam2 predictor needs a directory, not abs paths)
                 for frame_path in batch: 
@@ -133,17 +134,17 @@ class InferenceProcessor:
                         points = np.array(flat_points, dtype=np.float32)
                         # label 1 indicates a positive click (to add a region) 
                         # while label 0 indicates a negative click (to remove a region).
-                        labels = np.zeros(points.shape[0], dtype=np.int32) 
+                        labels = np.ones(points.shape[0], dtype=np.int32) # esto no puede ser zeros porq en la bbox se selecciona 1. 
                     
                         ann_obj_id = 1 # unique id for the object we are annotating.
                         bbox = self.video.get_bounding_box(frame_idx)
+                        box = np.array([bbox[0], bbox[1], bbox[2], bbox[3]], dtype=np.float32)  # Convert to float32
                         _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=batch_inference_state,
-                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, points= points, labels=labels, box=bbox)
+                                                                                        frame_idx=frame_idx, obj_id=ann_obj_id, points= points, labels=labels, box=box)
 
                     else: 
                         flat_points = [pt for pts in self.video.coordinates.values() for pt in pts]
                         points = np.array(flat_points, dtype=np.float32)
-                        # points = np.array(list(self.video.coordinates.values()), dtype=np.float32)
                         # label 1 indicates a positive click (to add a region) 
                         # while label 0 indicates a negative click (to remove a region).
                         labels = np.ones(points.shape[0], dtype=np.int32) 
@@ -159,7 +160,7 @@ class InferenceProcessor:
                             
                     if video_segmentations: 
                         last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze() # save the last mask. 
-
+ 
                     else: 
                         raise ValueError("Error: No mask found for the last frame in the batch.")
                     
