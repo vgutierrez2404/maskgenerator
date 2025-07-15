@@ -90,7 +90,7 @@ def on_frames_confirmed(video:Video):
     
     """
 
-    video_segments = InferenceProcessor(video=video).run_inference() # run the inference. 
+    video_segments, segmentation_logits = InferenceProcessor(video=video).run_inference() # run the inference. 
 
     frame_names = video.get_frame_names()
 
@@ -100,6 +100,10 @@ def on_frames_confirmed(video:Video):
     # render the segmentation results every few frames
     masks_path = os.path.join(video.frames_path, "masks")   
     os.makedirs(masks_path, exist_ok=True)  
+
+    logits_path = os.path.join(video.frames_path, "segmentation_logits")
+    os.makedirs(logits_path, exist_ok=True)
+    fnc.save_masks_logits(segmentation_logits, logits_path) 
 
     vis_frame_stride = 30
     plt.close("all")    

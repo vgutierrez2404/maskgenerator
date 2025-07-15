@@ -92,13 +92,19 @@ class InferenceProcessor:
         _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(inference_state=inference_state, frame_idx=frame_index, obj_id=ann_obj_id, points=points, labels=labels)
         
         video_segmentations = {}  # video_segments contains the per-frame segmentation results
+        segmentation_logits = {}
         for out_frame_idx, out_obj_ids, out_mask_logits in self.predictor.propagate_in_video(inference_state):
             video_segmentations[out_frame_idx] = {
                 out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                 for i, out_obj_id in enumerate(out_obj_ids)
             }
+            # save the logits of the mask for each frame.
+            segmentation_logits[out_frame_idx] = {
+                out_obj_id: out_mask_logits[i].cpu().numpy()
+                for i, out_obj_id in enumerate(out_obj_ids)
+                }
 
-        return video_segmentations 
+        return video_segmentations, segmentation_logits
 
     def _inference_by_batches(self): 
         """
@@ -116,6 +122,7 @@ class InferenceProcessor:
                 yield frame_paths[i:i + batch_size]
 
         video_segmentations = {} # frame_idx-mask. 
+        segmentation_logits = {} # frame_idx-mask_logits
         last_mask = None 
 
         for index, batch in enumerate(tqdm(batch_generator(self.video.get_frame_names(), self.config.batch_size))):
@@ -157,7 +164,12 @@ class InferenceProcessor:
                                 out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                                 for i, out_obj_id in enumerate(out_obj_ids)
                                 }
-                            
+                            # save the logits of the mask for each frame.
+                            segmentation_logits[(index * self.config.batch_size) + out_frame_idx] = {
+                                out_obj_id: out_mask_logits[i].cpu().numpy()
+                                for i, out_obj_id in enumerate(out_obj_ids)
+                            }
+
                     if video_segmentations: 
                         last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze() # save the last mask. 
  
@@ -174,6 +186,11 @@ class InferenceProcessor:
                             out_obj_id: (out_mask_logits[i] > 0.0).cpu().numpy()
                             for i, out_obj_id in enumerate(out_obj_ids)
                             }
+                        # save the logits of the mask for each frame.
+                        segmentation_logits[(index * self.config.batch_size) + out_frame_idx] = {
+                            out_obj_id: out_mask_logits[i].cpu().numpy()
+                            for i, out_obj_id in enumerate(out_obj_ids)
+                        }
                         
                     last_mask = next(reversed(video_segmentations[(index * self.config.batch_size) + out_frame_idx].values())).squeeze()
                 
@@ -182,7 +199,7 @@ class InferenceProcessor:
 
             print(f"Processing next batch {index + 1 }\n")  
 
-        return video_segmentations      
+        return video_segmentations , segmentation_logits    
 
     def run_inference(self):
         """
@@ -193,7 +210,9 @@ class InferenceProcessor:
         
         else:
             
-            video_segmentations = self._normal_inference()
+            video_segmentations, segmentation_logits = self._normal_inference()
             if not video_segmentations: 
                 raise ValueError("Error while trying to run inference. No video_segmentations found.")
-            
+            if not segmentation_logits:
+                raise ValueError("Error while trying to run inference. No segmentation_logits found.")
+            return video_segmentations, segmentation_logits

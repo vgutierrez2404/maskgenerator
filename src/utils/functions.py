@@ -129,7 +129,7 @@ def add_mask_and_save_image(masks_path: str, image:Image, mask:np.array, out_fra
     
     masked_image = Image.fromarray(res_image)
     
-    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:08d}.jpg")) # this is resetting the index of the frames!! CARE
+    masked_image.save(os.path.join(masks_path, f"frame_{out_frame_idx:08d}_mask.jpg")) # this is resetting the index of the frames!! CARE
 
 def check_for_preprocesed_frames(): 
     """ before loading a video to the app check if some other application 
@@ -187,3 +187,10 @@ def select_input_type():
 
     return selection_type
 
+def save_masks_logits(segmentation_logits:dict, path:str) -> None:
+    """
+    Save the segmentation logits to a .npy file. 
+    """
+    for frame_idx, logit in segmentation_logits.items():
+        filename = f"frame_{frame_idx:08d}_mask_logit.npy"
+        np.save(os.path.join(path, filename), logit, allow_pickle=True)
