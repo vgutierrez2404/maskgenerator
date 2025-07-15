@@ -176,7 +176,7 @@ class FrameViewer:
     def on_button_release(self, event):
 
         frame_width, frame_height = self.current_frame.width(), self.current_frame.height()
-        img_height, img_width = self.video.frame_size  # Assuming you store original size
+        img_width, img_height = self.video.frame_size  # Assuming you store original size
         
         if self.is_dragging:
             # User drew a box
